@@ -235,6 +235,8 @@ extern HANDLE   fp;
 
 extern BOOL     fMLE_is_broken;
 
+extern WNDPROC	DefEditWindowProc;
+
 //
 // Holds header and footer strings to be used in printing.
 // use HEADER and FOOTER to index.
@@ -329,6 +331,7 @@ LPTSTR PASCAL far PFileInPath (LPTSTR sz);
 
 BOOL FAR CheckSave (BOOL fSysModal);
 WNDPROC FAR NPWndProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
+LRESULT CALLBACK EditWndProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
 void FAR SetTitle (TCHAR *sz);
 INT FAR  AlertBox (HWND hwndParent, TCHAR *szCaption, TCHAR *szText1,
                    TCHAR *szText2, UINT style);

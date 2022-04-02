@@ -853,6 +853,9 @@ INT FAR NPInit (HINSTANCE hInstance, HINSTANCE hPrevInstance,
                      hwndNP, (HMENU)ID_EDIT, hInstance, (LPVOID)NULL)))
         return FALSE;
 
+	// assign window procedure to edit control
+	DefEditWindowProc = (WNDPROC) SetWindowLongPtr(hwndEdit, GWLP_WNDPROC, (LONG_PTR) EditWndProc);
+
     // create a status window.
     hwndStatus = CreateStatusWindow ((fStatus?WS_VISIBLE:0)|WS_BORDER|WS_CHILD|WS_CLIPSIBLINGS, TEXT(""), hwndNP, ID_STATUS_WINDOW);
     if ( !hwndStatus )
