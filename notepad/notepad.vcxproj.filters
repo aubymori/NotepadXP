@@ -41,33 +41,33 @@
     <None Include="notepad.def">
       <Filter>Source Files</Filter>
     </None>
-    <None Include="notepad.dlg">
-      <Filter>Source Files</Filter>
-    </None>
     <None Include="notepad.ico">
-      <Filter>Source Files</Filter>
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="notepad.dlg">
+      <Filter>Resource Files</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="notepad.h">
-      <Filter>Source Files</Filter>
+      <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="precomp.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="uniconv.h">
-      <Filter>Source Files</Filter>
+      <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="uconvert.h">
-      <Filter>Source Files</Filter>
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="uniconv.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="winnlsp.h">
-      <Filter>Source Files</Filter>
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="notepad.rc">
-      <Filter>Source Files</Filter>
+      <Filter>Resource Files</Filter>
     </ResourceCompile>
   </ItemGroup>
 </Project>
