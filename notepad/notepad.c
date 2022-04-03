@@ -1679,8 +1679,6 @@ BOOL IsBreakChar(
 	return (wch == szBreakChars[iMin] || wch == szBreakChars[iMax]);
 }
 
-//#define ISDELIMITERW(ch) (((ch) == L' ') || ((ch) == L'\t'))
-
 INT CALLBACK EditWordBreakProc(
 	LPWSTR	lpszEditText,
 	INT		ichCurrent,
