@@ -3,14 +3,17 @@
 #define NOCOMM
 #define NOSOUND
 #include <windows.h>
-#include <ole2.h>
-#include <commdlg.h>
-#include <commctrl.h>
-// we need this for CharSizeOf(), ByteCountOf(),
-#include "uniconv.h"
 
-#define STRSAFE_NO_DEPRECATE
-#include <strsafe.h>
+#ifndef RC_INVOKED // disable identifier truncation warning in resource compiler
+#  include <ole2.h>
+#  include <commdlg.h>
+#  include <commctrl.h>
+   // we need this for CharSizeOf(), ByteCountOf(),
+#  include "uniconv.h"
+
+#  define STRSAFE_NO_DEPRECATE
+#  include <strsafe.h>
+#endif // ifndef RC_INVOKED
 
 /* handy debug macro */
 #define ODS OutputDebugString
