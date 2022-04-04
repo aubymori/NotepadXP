@@ -41,27 +41,27 @@
     <None Include="notepad.def">
       <Filter>Source Files</Filter>
     </None>
-    <None Include="notepad.ico">
+    <None Include="notepad.dlg">
       <Filter>Resource Files</Filter>
     </None>
-    <None Include="notepad.dlg">
+    <None Include="notepad.ico">
       <Filter>Resource Files</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="notepad.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="precomp.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="uconvert.h">
+    <ClInclude Include="winnlsp.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="uniconv.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="winnlsp.h">
+    <ClInclude Include="uconvert.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="precomp.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="notepad.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

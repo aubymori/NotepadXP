@@ -4,7 +4,7 @@
 #define NOSOUND
 #include <windows.h>
 
-#ifndef RC_INVOKED // disable identifier truncation warning in resource compiler
+#ifndef RC_INVOKED
 #  include <ole2.h>
 #  include <commdlg.h>
 #  include <commctrl.h>
@@ -418,4 +418,3 @@ INT    IsInputTextUnicode(LPSTR lpstrInputStream, INT iLen);
 // Private message to track the HKL switch
 
 #define PWM_CHECK_HKL                   (WM_APP + 1)
-

@@ -1077,7 +1077,7 @@ INT FAR NPInit (HINSTANCE hInstance, HINSTANCE hPrevInstance,
 }
 
 /* ** Notepad class registration proc */
-BOOL NPRegister (HANDLE hInstance)
+BOOL NPRegister (HINSTANCE hInstance)
 {
     WNDCLASSEX   NPClass;
     PWNDCLASSEX  pNPClass = &NPClass;
