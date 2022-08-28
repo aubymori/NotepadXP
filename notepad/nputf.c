@@ -91,53 +91,31 @@ INT IsTextUTF8( LPSTR lpstrInputStream, INT iLen )
  *
  * Return value:  TRUE, if the text is in Unicode format.
  *
- * 29 June 1998          
+ * 29 June 1998
+ *
+ * Changes:
+ * 18 August 2022 - Fix "Bush hid the facts" bug.
+ *     Remove IS_TEXT_UNICODE_STATISTICS and its reverse counterpart from the list of flags
+ *     supplied to IsTextUnicode.
  */
 
 
-INT IsInputTextUnicode  (LPSTR lpstrInputStream, INT iLen)
+INT IsInputTextUnicode(
+	LPSTR	lpstrInputStream,
+	INT		iLen)
 {
-    INT  iResult= ~0; // turn on IS_TEXT_UNICODE_DBCS_LEADBYTE
-    BOOL bUnicode;
+	INT iResult =	IS_TEXT_UNICODE_ASCII16 | IS_TEXT_UNICODE_REVERSE_ASCII16 |
+					IS_TEXT_UNICODE_CONTROLS | IS_TEXT_UNICODE_REVERSE_CONTROLS |
+					IS_TEXT_UNICODE_SIGNATURE | IS_TEXT_UNICODE_REVERSE_SIGNATURE |
+					IS_TEXT_UNICODE_ILLEGAL_CHARS |
+					IS_TEXT_UNICODE_ODD_LENGTH |
+					IS_TEXT_UNICODE_NULL_BYTES;
 
-    bUnicode= IsTextUnicode( lpstrInputStream, iLen, &iResult);
+	if (iLen < 2) {
+		// Text with 0 bytes has no character encoding so we can assume ANSI for further processing.
+		// Text with 1 byte is highly probable to be ANSI.
+		return FALSE;
+	}
 
-    // this code is not required as IsTextUnicode does the required checks
-    // and it's legal to have a unicode char with a DBCS leading byte!
-
-#ifdef UNUSEDCODE
-{
-
-    if (bUnicode                                         &&
-       ((iResult & IS_TEXT_UNICODE_STATISTICS)    != 0 ) &&
-       ((iResult & (~IS_TEXT_UNICODE_STATISTICS)) == 0 )    )
-    {
-        CPINFO cpiInfo;
-        CHAR* pch= (CHAR*)lpstrInputStream;
-        INT  cb;
-
-        //
-        // If the result depends only upon statistics, check
-        // to see if there is a possibility of DBCS.
-        // Only do this check if the ansi code page is DBCS
-        //
-
-        GetCPInfo( CP_ACP, &cpiInfo);
-
-        if( cpiInfo.MaxCharSize > 1 )
-        {
-            for( cb=0; cb<iLen; cb++ )
-            {
-                if( IsDBCSLeadByte(*pch++) )
-                {
-                    return FALSE;
-                }
-            }
-        }
-     }
-}
-
-#endif
-
-     return bUnicode;
+	return IsTextUnicode(lpstrInputStream, iLen, &iResult);
 }

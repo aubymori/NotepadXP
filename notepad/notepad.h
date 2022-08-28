@@ -237,6 +237,7 @@ extern TCHAR    szFileName[];
 extern HANDLE   fp;
 
 extern BOOL     fMLE_is_broken;
+extern BOOL		fWindowsOnlyEOL;
 
 extern WNDPROC	DefEditWindowProc;
 
@@ -338,7 +339,6 @@ LRESULT CALLBACK EditWndProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lPa
 void FAR SetTitle (TCHAR *sz);
 INT FAR  AlertBox (HWND hwndParent, TCHAR *szCaption, TCHAR *szText1,
                    TCHAR *szText2, UINT style);
-void FAR NpWinIniChange (VOID);
 void FAR FreeGlobalPD (void);
 INT_PTR CALLBACK GotoDlgProc(HWND hDlg,UINT message,WPARAM wParam,LPARAM lParam);
 VOID CALLBACK WinEventFunc(HWINEVENTHOOK hWinEventHook, DWORD event, HWND hwnd, LONG idObject,
@@ -364,7 +364,6 @@ VOID FAR  AlertUser_FileFail( LPTSTR szFileName );
 /* procs in npinit.c */
 INT FAR  NPInit (HANDLE hInstance, HANDLE hPrevInstance,
                  LPTSTR lpCmdLine, INT cmdShow);
-void FAR InitLocale (VOID);
 void SaveGlobals( VOID );
 
 /* procs in npmisc.c */

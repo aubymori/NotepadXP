@@ -256,6 +256,9 @@ VOID GetGlobals( VOID )
 
     fMLE_is_broken= RegGetInt( hKey, TEXT("fMLE_is_broken"), FALSE );  // assume edit control works
 
+	// 18-08-2022: Respect registry settings regarding windows 10 notepad and Unix line endings
+	fWindowsOnlyEOL = RegGetInt(hKey, TEXT("fWindowsOnlyEOL"), 0);
+
 	if( hKey )
 	{
 		RegCloseKey( hKey );
@@ -744,7 +747,6 @@ INT FAR NPInit (HINSTANCE hInstance, HINSTANCE hPrevInstance,
     INT    iParts[3];
     HMENU  hMenu;          // handle to the menu.
 
-
     /* determine the message number to be used for communication with
      * Find dialog
      */
@@ -762,8 +764,6 @@ INT FAR NPInit (HINSTANCE hInstance, HINSTANCE hPrevInstance,
     /* Go load strings */
     if (!InitStrings (hInstance))
         return FALSE;
-
-    InitLocale();     // localize strings etc.
 
     /* Load the arrow and hourglass cursors. */
     hStdCursor= LoadCursor( NULL,
@@ -797,18 +797,18 @@ INT FAR NPInit (HINSTANCE hInstance, HINSTANCE hPrevInstance,
 
     GetGlobals();
 
-    hwndNP= CreateWindow(  szNotepad, 
-                           TEXT(""),
-                           WS_OVERLAPPED | WS_CAPTION     | WS_SYSMENU     |
-                           WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | 0,
-                           g_WPleft,     // x
-                           g_WPtop,      // y
-                           g_WPDX,       // width
-                           g_WPDY,       // height
-                           (HWND)NULL,   // parent or owner
-                           (HMENU)NULL,  // menu or child window
-                           hInstance,    // application instance
-                           NULL);        // window creation data
+    hwndNP= CreateWindow(szNotepad, 
+                         TEXT(""),
+                         WS_OVERLAPPED | WS_CAPTION     | WS_SYSMENU     |
+                         WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_CLIPCHILDREN,
+                         g_WPleft,     // x
+                         g_WPtop,      // y
+                         g_WPDX,       // width
+                         g_WPDY,       // height
+                         (HWND)NULL,   // parent or owner
+                         (HMENU)NULL,  // menu or child window
+                         hInstance,    // application instance
+                         NULL);        // window creation data
 
     g_PageSetupDlg.hwndOwner     = hwndNP;
 
@@ -1082,14 +1082,8 @@ BOOL NPRegister (HINSTANCE hInstance)
     WNDCLASSEX   NPClass;
     PWNDCLASSEX  pNPClass = &NPClass;
 
-/* Bug 12191: If Pen Windows is running, make the background cursor an
- * arrow instead of the edit control ibeam.  This way the user will know
- * where they can use the pen for writing vs. what will be considered a
- * mouse action.   18 October 1991       Clark Cyr
- */
     pNPClass->cbSize        = sizeof(NPClass);
-    pNPClass->hCursor       = LoadCursor(NULL, GetSystemMetrics(SM_PENWINDOWS)
-                                               ? IDC_ARROW : IDC_IBEAM);
+    pNPClass->hCursor       = LoadCursor(NULL, IDC_IBEAM);
     pNPClass->hIcon         = LoadIcon(hInstance,
                                       (LPTSTR) MAKEINTRESOURCE(ID_ICON));
 
@@ -1110,12 +1104,4 @@ BOOL NPRegister (HINSTANCE hInstance)
         return (FALSE);
 
     return (TRUE);
-}
-
-
-/* Get Locale info from the Registry, and initialize global vars  */
-
-void FAR InitLocale (void)
-{
-
 }

@@ -22,7 +22,10 @@
 // 1, 1, 4, 0 -> bug fix for handling files with more carriage returns than line feeds
 // 1, 2, 0, 0 -> remove CRT dependency and add Windows 2000 support
 // 1, 2, 1, 0 -> add configuration option to change tab width
-// 1, 2, 2, 0 -> add Ctrl+Backspace support
+// 1, 2, 2, 0 -> add Ctrl+Backspace support, reduce edit control flicker on XP+,
+//               add dirty indicator in title bar, changed selection line/column display,
+//				 remove "Bush hid the facts" bug,
+//				 add Ctrl+Shift+S shortcut for Save As
 // Note: PRODUCTVERSION == FILEVERSION
 1 VERSIONINFO
 	FILEVERSION 1, 2, 2, 0
@@ -54,15 +57,15 @@ ID_MENUBAR  MENU PRELOAD DISCARDABLE
 BEGIN
     POPUP   "&File"
         BEGIN
-            MENUITEM    "&New\tCtrl+N",          M_NEW
-            MENUITEM    "&Open...\tCtrl+O",      M_OPEN
-            MENUITEM    "&Save\tCtrl+S",         M_SAVE
-            MENUITEM    "Save &As...",           M_SAVEAS
+            MENUITEM    "&New\tCtrl+N",							M_NEW
+            MENUITEM    "&Open...\tCtrl+O",						M_OPEN
+            MENUITEM    "&Save\tCtrl+S",						M_SAVE
+            MENUITEM    "Save &As...\tCtrl+Shift+S",			M_SAVEAS
             MENUITEM    SEPARATOR
-            MENUITEM    "Page Set&up...",        M_PAGESETUP
-            MENUITEM    "&Print...\tCtrl+P",     M_PRINT
+            MENUITEM    "Page Set&up...",						M_PAGESETUP
+            MENUITEM    "&Print...\tCtrl+P",					M_PRINT
             MENUITEM    SEPARATOR
-            MENUITEM    "E&xit",                 M_EXIT
+            MENUITEM    "E&xit",								M_EXIT
         END
 
     POPUP   "&Edit"
@@ -120,6 +123,7 @@ BEGIN
     "N",       M_NEW,      VIRTKEY, CONTROL
     "O",       M_OPEN,     VIRTKEY, CONTROL
     "S",       M_SAVE,     VIRTKEY, CONTROL
+	"S",       M_SAVEAS,   VIRTKEY, CONTROL, SHIFT
     "P",       M_PRINT,    VIRTKEY, CONTROL
     VK_INSERT, M_COPY,     VIRTKEY, CONTROL
     VK_F1,     M_HELP,     VIRTKEY

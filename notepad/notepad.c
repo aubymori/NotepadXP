@@ -52,7 +52,9 @@ BOOL     fInSaveAsDlg = FALSE;
 // Users were not happy, so we will put up with possible AVs.  Note: as of June 27, 2001
 // we could not repro the AV behavior, so perhaps it is not there anymore.
 
-BOOL     fMLE_is_broken= FALSE;     
+BOOL     fMLE_is_broken= FALSE; 
+
+BOOL	 fWindowsOnlyEOL = FALSE;
 
 /* variables for the new File/Open, File/Saveas,Find Text and Print dialogs */
 OPENFILENAME OFN;                     /* passed to the File Open/save APIs */
@@ -63,6 +65,8 @@ NP_FILETYPE g_ftSaveAs;               /* current file was opened           */
 // these two are automatically handled and aren't offered as options in the dialogs
 NP_LINETYPE g_ltOpenedAs = LT_WINDOWS;
 NP_LINETYPE g_ltSaveAs; // unused for now
+
+BOOL g_bDirty = FALSE;
 
 FINDREPLACE FR;                       /* Passed to FindText()              */
 PAGESETUPDLG g_PageSetupDlg;
@@ -1158,6 +1162,16 @@ INT NPCommand(
             break;
 
         case ID_EDIT:
+			// 18-08-2022 notepadEx - add a handler here which updates the titlebar status
+			if (g_bDirty == FALSE && HIWORD(wParam) == EN_CHANGE && SendMessage(hwndEdit, EM_GETMODIFY, 0, 0)) {
+				TCHAR lpNewTitle[MAX_PATH + 11];
+
+				if (GetWindowText(hwndNP, lpNewTitle + 1, ARRAYSIZE(lpNewTitle))) {
+					lpNewTitle[0] = '*';
+					SetWindowText(hwndNP, lpNewTitle);
+					g_bDirty = TRUE;
+				}
+			}
             break;
 
         case M_PRINT:
@@ -1945,14 +1959,6 @@ WNDPROC FAR NPWndProc(
                return (WNDPROC) (DefWindowProc(hwnd, message, wParam, lParam));
             break;
 
-
-        case WM_WININICHANGE:
-            // Ignore for now.
-            // If you put this back in, be sure it handles both
-            // the metric change and the decimal change.
-            //NpWinIniChange ();
-            break;
-
         case WM_DROPFILES: /*case added 03/26/91 for file drag/drop support*/
             doDrop (wParam,hwnd);
             break;
@@ -2032,8 +2038,7 @@ WNDPROC FAR NPWndProc(
                    SendMessage( hwndEdit, EM_SETSEL, 0, 0 );
                    SendMessage( hwndEdit, EM_SCROLLCARET, 0, 0);
                    UpdateStatusBar( TRUE );
-
-                }
+				}
                 else if (dwFlags & FR_DIALOGTERM)
                     hDlgFind = NULL;   /* invalidate modeless window handle */
                 break;
@@ -2081,24 +2086,14 @@ INT WINAPI WinMain(
    INT cmdShow)
 {
     MSG msg;
-    VOID (FAR PASCAL *lpfnRegisterPenApp)(WORD, BOOL) = NULL;
     LPTSTR lpCmdLine = GetCommandLine ();
     HWINEVENTHOOK hEventHook = NULL;
 
 	CoInitialize(NULL);
 
-/* PenWindow registration must be before creating an edit class window.
- * Moved here, along with goto statement below for appropriate cleanup.
- *                 10 July 1991    ClarkC
- */
-    if ((FARPROC) lpfnRegisterPenApp = GetProcAddress((HINSTANCE)(INT_PTR)(GetSystemMetrics(SM_PENWINDOWS)),
-        "RegisterPenApp"))
-        (*lpfnRegisterPenApp)(1, TRUE);
-
     if (!NPInit(hInstance, hPrevInstance, SkipProgramName (lpCmdLine), cmdShow))
     {
-       msg.wParam = FALSE;
-       goto UnRegisterPenWindows;
+       return FALSE;
     }
 
     // set an event hook to get the cursor position! this event hook is used to update
@@ -2131,22 +2126,15 @@ INT WINAPI WinMain(
     }
 
     /* Clean up any global allocations */
-
     FreeGlobal();
-
     LocalFree( hEdit );
 
-    if (hEventHook)
-        UnhookWinEvent(hEventHook);
+    if (hEventHook) {
+		UnhookWinEvent(hEventHook);
+	}
 
-UnRegisterPenWindows:
-
-    if (lpfnRegisterPenApp)
-        (*lpfnRegisterPenApp)(1, FALSE);
-
-    return (int)(msg.wParam);
+	return (INT) (msg.wParam);
 }
-
 
 // WinEventFunc is called whenever the location of the caret changes
 // in the edit window. The function updates the statusbar with the current
@@ -2157,6 +2145,7 @@ UnRegisterPenWindows:
 
 static DWORD iLastCol;
 static DWORD iLastLine;
+static DWORD SelRoot;
 static NP_LINETYPE ltLastLineType;
 
 VOID UpdateStatusBar( BOOL fForceStatus )
@@ -2167,11 +2156,29 @@ VOID UpdateStatusBar( BOOL fForceStatus )
 	NP_LINETYPE ltLineType;
 
     // get the current caret position.
-    SendMessage(hwndEdit,EM_GETSEL,(WPARAM) &SelStart,(WPARAM)&SelEnd);
+	SendMessage(hwndEdit, EM_GETSEL, (WPARAM) &SelStart, (WPARAM) &SelEnd);
 
-    // the line numbers are 1 based instead 0 based. hence add 1.
-    iLine = (UINT)SendMessage( hwndEdit, EM_LINEFROMCHAR, SelStart, 0 ) + 1;
-    iCol = SelStart - (UINT)SendMessage( hwndEdit, EM_LINEINDEX, iLine-1, 0 ) + 1;
+	// the line numbers are 1 based instead 0 based. hence add 1.
+	iLine = (UINT) SendMessage( hwndEdit, EM_LINEFROMCHAR, SelStart, 0 ) + 1;
+    iCol = SelStart - (UINT) SendMessage( hwndEdit, EM_LINEINDEX, iLine-1, 0 ) + 1;
+
+	// 18-08-2022 NotepadEx change
+	// Try to get the actual position of the cursor instead of just the start of the
+	// selection. The mechanism to do this "properly" was added in Windows 10 so that's
+	// why we have to use this hacky method. But it works, and it works well.
+	if (SelStart != SelEnd) {
+		// there is actual text selected, not just a simple cursor.
+		// we have to figure out the "direction" that the user selected text - whether
+		// it is "upwards" or "downwards". If it's "upwards" we don't need to do anything.
+		// Otherwise we need to set the line/column to the end of the selection.
+
+		if (SelRoot < SelEnd) {
+			iLine = (UINT) SendMessage(hwndEdit, EM_LINEFROMCHAR, SelEnd, 0) + 1;
+			iCol = SelEnd - (UINT) SendMessage(hwndEdit, EM_LINEINDEX, iLine - 1, 0) + 1;
+		}
+	} else {
+		SelRoot = SelStart;
+	} // end of NotepadEx change
 
     // don't bother to update status if it hasn't changed
     if( fForceStatus || (iCol!=iLastCol) || (iLine!=iLastLine) )
@@ -2311,6 +2318,7 @@ void FAR SetTitle( TCHAR  *sz )
 
     lstrcat(szWindowText, szNpTitle);
     SetWindowText(hwndNP, (LPTSTR)szWindowText);
+	g_bDirty = FALSE;
 }
 
 /* ** Given filename which may or maynot include path, return pointer to
@@ -2415,12 +2423,6 @@ VOID NpResetMenu( HWND hwnd )
     // check the status bar
 
     CheckMenuItem (GetSubMenu(hMenu, 3), M_STATUSBAR, fStatus ? MF_CHECKED: MF_UNCHECKED );
-}
-
-
-void FAR NpWinIniChange(VOID)
-{
-   InitLocale ();
 }
 
 /* ** Scan sz1 for merge spec.    If found, insert string sz2 at that point.

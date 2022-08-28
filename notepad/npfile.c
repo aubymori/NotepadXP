@@ -713,8 +713,16 @@ BOOL FAR LoadFile (TCHAR * sz, INT typeFlag )
     }
 
 	// figure out if the file uses Unix or Windows style line endings
-	// count the number of \r and the number of \n
-	if (ftOpenedAs == FT_ANSI || ftOpenedAs == FT_UTF8) {
+	// by counting the number of \r and the number of \n
+	// Note: this code doesn't consider Macintosh-style line endings. It would be easy
+	// to do though, just:
+	// } else if (nLF == 0 && nCR > 0) {
+	//     ltOpenedAs = LT_MAC;
+	// } ...
+	if (fWindowsOnlyEOL) {
+		// Assume CR-LF line endings if specified in the registry.
+		ltOpenedAs = LT_WINDOWS;
+	} else if (ftOpenedAs == FT_ANSI || ftOpenedAs == FT_UTF8) {
 		ULONG nCR = 0;
 		ULONG nLF = 0;
 
