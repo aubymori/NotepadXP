@@ -224,46 +224,32 @@ BOOL FAR SaveFile (HWND hwndParent, TCHAR *szFileSave, BOOL fSaveAs )
     // Obs: If saving to an existing file, make sure correct disk is in drive 
     // March 14, 2002: The user may have changed the diskette to one without
     // the named file.  Don't complain that it is not there.
-    // TODO: fold code and figure out why one has file_share_write
-    if (!fSaveAs)
-    {
-       fp= CreateFile( szFileSave,                 // name of file
-                       GENERIC_READ|GENERIC_WRITE, // access mode
-                       FILE_SHARE_READ,            // share mode
-                       NULL,                       // security descriptor
-                       OPEN_ALWAYS,                // how to create
-                       FILE_ATTRIBUTE_NORMAL,      // file attributes
-                       NULL);                      // hnd of file with attrs
 
-       if( fp != INVALID_HANDLE_VALUE )
-       {
-          fNew= (GetLastError() != ERROR_ALREADY_EXISTS );
-       }
-    }
-    else
-    {
+    // Carefully open the file.  Do not truncate it if it exists.
+    // set the fNew flag if it had to be created.
+    // We do all this in case of failures later in the process.
 
-       // Carefully open the file.  Do not truncate it if it exists.
-       // set the fNew flag if it had to be created.
-       // We do all this in case of failures later in the process.
+	// NotepadEx change: This used to have two branches, identical except that
+	// when fSaveAs is TRUE then FILE_SHARE_WRITE would be added.
+	// Can't see any reason why that would be like that so it is changed.
+	// Btw, all versions up to Win10 have this feature in the code...
+	fp= CreateFile( szFileSave,		// name of file
+					GENERIC_READ|GENERIC_WRITE, // access mode
+					FILE_SHARE_READ,			// share mode
+					NULL,						// security descriptor
+					OPEN_ALWAYS,				// how to create
+					FILE_ATTRIBUTE_NORMAL,		// file attributes
+					NULL);						// hnd of file with attrs
 
-       fp= CreateFile( szFileSave,                 // name of file
-                       GENERIC_READ|GENERIC_WRITE, // access mode
-                       FILE_SHARE_READ|FILE_SHARE_WRITE,  // share mode
-                       NULL,                       // security descriptor
-                       OPEN_ALWAYS,                // how to create
-                       FILE_ATTRIBUTE_NORMAL,      // file attributes
-                       NULL);                      // hnd of file with attrs
+	if( fp != INVALID_HANDLE_VALUE )
+	{
+		fNew= (GetLastError() != ERROR_ALREADY_EXISTS );
+	}
 
-       if( fp != INVALID_HANDLE_VALUE )
-       {
-          fNew= (GetLastError() != ERROR_ALREADY_EXISTS );
-       }
-    }
 
     if( fp == INVALID_HANDLE_VALUE )
     {
-		// Proper Win7 notepad behavior is to simply fall-through to the
+		// NotepadEx: Proper Win7 notepad behavior is to simply fall-through to the
 		// Save As code in case file save fails (e.g. no permission to write)
 //        AlertBox( hwndParent, szNN, szCREATEERR, szFileSave,
 //                        MB_APPLMODAL | MB_OK | MB_ICONEXCLAMATION);
@@ -414,6 +400,7 @@ CleanUp:
 
 } // end of SaveFile()
 
+// TaskDialog function pointer
 typedef HRESULT (WINAPI *TD)(HWND, HINSTANCE, PCWSTR, PCWSTR, PCWSTR, TASKDIALOG_COMMON_BUTTON_FLAGS, PCWSTR, int *);
 
 /* Read contents of file from disk.
@@ -1025,7 +1012,7 @@ VOID FAR AlertUser_FileFail( LPTSTR szFileName )
                    FORMAT_MESSAGE_FROM_SYSTEM,
                    NULL,
                    GetLastError(),
-                   GetUserDefaultUILanguage(),
+                   0,
                    msg,  // where message will end up
                    CharSizeOf(msg), NULL );
     if( dwStatus )

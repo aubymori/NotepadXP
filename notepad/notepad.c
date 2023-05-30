@@ -280,18 +280,21 @@ VOID PASCAL SetPageSetupDefaults( VOID )
 /* Standard window size proc */
 void NPSize (int cxNew, int cyNew)
 {
-
     /* Invalidate the edit control window so that it is redrawn with the new
      * margins. Needed when comming up from iconic and when doing word wrap so
      * the new margins are accounted for.
      */
 
-    InvalidateRect(hwndEdit, (LPRECT)NULL, TRUE);
+	// NotepadEx: This InvalidateRect call causes flickering on window resize.
+	// It also doesn't seem to be necessary at all for the stated reasons in
+	// the original comment, above.
+	// Furthermore, this call seems to have been removed on Windows 7.
+	// After testing on XP and 2000 it doesn't seem to be needed there either.
+    //InvalidateRect(hwndEdit, (LPRECT)NULL, TRUE);
 
     // the height of the edit window depends on whether the status bar is
     // displayed.
-    MoveWindow (hwndEdit, 0, 0, cxNew, cyNew - (fStatus?dyStatus:0), TRUE);
-
+    MoveWindow(hwndEdit, 0, 0, cxNew, cyNew - (fStatus ? dyStatus : 0), TRUE);
 }
 
 // NpSaveDialogHookProc
@@ -551,29 +554,101 @@ UINT_PTR APIENTRY NpOpenDialogHookProc(
     return( FALSE );
 }
 
+// Added for NotepadEx.
+// Get the 0-based index of the character at the start of a given line.
+// The line number is 0-based. Returns -1 if no given line is present.
+ULONG GetEditControlRealCharacterIndexFromLineNumber(
+	IN	HWND	Window,
+	IN	ULONG	LineNumber)
+{
+	HLOCAL EditControlBufferHandle;
+	PWSTR EditControlBuffer;
+	ULONG Index;
+	UINT LineNumberTemp;
+
+	if (LineNumber == 0) {
+		return 0;
+	}
+
+	Index = 0;
+	LineNumberTemp = 0;
+
+	EditControlBufferHandle = Edit_GetHandle(Window);
+
+	if (!EditControlBufferHandle) {
+		return -1;
+	}
+
+	EditControlBuffer = (PWSTR) LocalLock(EditControlBufferHandle);
+
+	if (!EditControlBuffer) {
+		return -1;
+	}
+
+	while (TRUE) {
+		if (EditControlBuffer[Index] == '\0') {
+			Index = -2; // we're gonna add 1 to it
+			break;
+		}
+
+		if (EditControlBuffer[Index] == '\n') {
+			++LineNumberTemp;
+
+			if (LineNumberTemp == LineNumber) {
+				break;
+			}
+		}
+
+		++Index;
+	}
+
+	LocalUnlock(EditControlBufferHandle);
+
+	return Index + 1;
+}
+
 // GotoAndScrollInView
 //
 // Put the cursor at the begining of a line, and scroll the
 // editbox so the user can see it.
 //
 // If there is a failure, it just leaves the cursor where it is.
+// Return TRUE on success and FALSE on failure.
 //
-
-VOID GotoAndScrollInView( INT OneBasedLineNumber )
+BOOLEAN GotoAndScrollInView( INT OneBasedLineNumber )
 {
     UINT CharIndex;
-    CharIndex= (UINT) SendMessage( hwndEdit,
-                                   EM_LINEINDEX,
-                                   OneBasedLineNumber-1,
-                                   0 );
-    if( CharIndex != (UINT) -1 )
-    {
-        SendMessage( hwndEdit, EM_SETSEL, CharIndex, CharIndex);
-        SendMessage( hwndEdit, EM_SCROLLCARET, 0, 0 );
-    }
 
+	if (OneBasedLineNumber == 0) {
+		OneBasedLineNumber = 1;
+	}
+
+	if (fWrap) {
+		// NotepadEx: Different algorithm is required when we go to a
+		// specific line when word wrap is enabled. The edit control
+		// thinks in terms of on-screen lines, whereas we want to use
+		// real line numbers (as in, # of newline characters).
+
+		CharIndex = GetEditControlRealCharacterIndexFromLineNumber(
+			hwndEdit,
+			OneBasedLineNumber - 1);
+	} else {
+		CharIndex = (UINT) SendMessage(	hwndEdit,
+										EM_LINEINDEX,
+										OneBasedLineNumber-1,
+										0 );
+	}
+
+	if (CharIndex == -1) {
+		return FALSE;
+	}
+    
+    SendMessage( hwndEdit, EM_SETSEL, CharIndex, CharIndex);
+    SendMessage( hwndEdit, EM_SCROLLCARET, 0, 0 );
+	return TRUE;
 }
 
+// NotepadEx: added for Vista+ file open/save dialog
 // {9BEB83A7-0F24-4afe-B04E-D22A0DAF41FD}
 DEFINE_GUID(IID_IFileDialogEvents, 
 0x9beb83a7, 0xf24, 0x4afe, 0xb0, 0x4e, 0xd2, 0x2a, 0xd, 0xaf, 0x41, 0xfd);
@@ -726,7 +801,7 @@ BOOL NPOpenSave(
 		FILEOPENDIALOGOPTIONS dwFlags = 0;
 		LPWSTR szName = NULL;
 		COMDLG_FILTERSPEC filterFileExt[] = {
-//			{L"Text", L"*.ahk;*.asc;*.asm;*.bas;*.bat;*.c;*.c++;*.cpp;*.cc;*.cfg;*.cmd;*.cs;*.css;*.csv;*.def;*.dlg;*.f03;*.f08;*.f18;*.f4;*.f77;*.f90;*.f95;*.for;*.go;*.h;*.h++;*.hh;*.hpp;*.hta;*.htm;*.html;*.hxx;*.idl;*.ini;*.jl;*.java;*.js;*.json;*.lisp;*.lua;*.m4;*.md;*.nim;*.pas;*.pem;*.php;*.php3;*.php4;*.ps;*.rb;*.rc;*.reg;*.rgs;*.rs;*.rst;*.s;*.scala;*.scm;*.sh;*.shar;*.shtm;*.shtml;*.sl;*.svg;*.txt;*vb;*.vbox;*.vbs;*.y;*.yml;*.yaml"},
+//			{L"Text", L"*.ahk;*.asc;*.asm;*.bas;*.bat;*.c;*.c++;*.cpp;*.cc;*.cfg;*.cmd;*.cs;*.css;*.csv;*.def;*.dlg;*.f03;*.f08;*.f18;*.f4;*.f77;*.f90;*.f95;*.for;*.go;*.h;*.h++;*.hh;*.hpp;*.hta;*.htm;*.html;*.hxx;*.idl;*.ini;*.jl;*.java;*.js;*.json;*.lisp;*.lua;*.m4;*.md;*.nfo;*.nim;*.pas;*.pem;*.php;*.php3;*.php4;*.ps;*.rb;*.rc;*.reg;*.rgs;*.rs;*.rst;*.s;*.scala;*.scm;*.sh;*.shar;*.shtm;*.shtml;*.sl;*.svg;*.txt;*vb;*.vbox;*.vbs;*.y;*.yml;*.yaml"},
 			{L"Text Documents", L"*.txt"},
 			{L"All Files", L"*.*"}
 		};
@@ -854,6 +929,101 @@ BOOL NPOpenSave(
 	}
 }
 
+// NotepadEx addition.
+// Copy the selected text out of an edit control into a buffer.
+// If there is nothing selected OR an error occured, an empty string
+// is placed into the buffer and 0 is returned. Otherwise, the length
+// of the selection is returned.
+// If the size of the selection is larger than the size of the buffer,
+// nothing will be copied and 0 is returned.
+// The length returned is in characters, not bytes.
+ULONG CopyEditControlSelectionText(
+	HWND	Window,
+	PWCHAR	Buffer,
+	ULONG	BufferCch)
+{
+	ULONG SelectionStart;
+	ULONG SelectionEnd;
+	ULONG SelectionLength;
+	HLOCAL EditControlBufferHandle;
+	PWCHAR EditControlBuffer;
+
+	if (BufferCch == 0) {
+		// 0 is an invalid parameter.
+		return 0;
+	}
+
+	// Initialize buffer with empty string
+	Buffer[0] = '\0';
+
+	// Retrieve the length of the selected text.
+	SendMessage(Window, EM_GETSEL, (WPARAM) &SelectionStart, (LPARAM) &SelectionEnd);
+	SelectionLength = SelectionEnd - SelectionStart;
+
+	if (SelectionLength == 0) {
+		// There is no selection.
+		return 0;
+	} else if (SelectionLength > (BufferCch - 1)) {
+		// The selection length is longer than what would fit into the buffer.
+		return 0;
+	}
+
+	// Lock the edit control's buffer so we can get a direct pointer to
+	// the text inside.
+	
+	EditControlBufferHandle = Edit_GetHandle(Window);
+
+	if (!EditControlBufferHandle) {
+		return 0;
+	}
+
+	EditControlBuffer = (PWCHAR) LocalLock(EditControlBufferHandle);
+
+	if (!EditControlBuffer) {
+		return 0;
+	}
+
+	RtlCopyMemory(Buffer, &EditControlBuffer[SelectionStart], SelectionLength * sizeof(WCHAR));
+	Buffer[SelectionLength] = '\0';
+	LocalUnlock(EditControlBufferHandle);
+
+	return SelectionLength;
+}
+
+UINT_PTR CALLBACK FindReplaceHookProc(
+	IN	HWND	Dialog,
+	IN	UINT	Message,
+	IN	WPARAM	WParam,
+	IN	LPARAM	LParam)
+{
+	STATIC LPFINDREPLACE FindReplaceInfo;
+
+	switch (Message) {
+	case WM_INITDIALOG:
+		FindReplaceInfo = (LPFINDREPLACE) LParam;
+		CheckDlgButton(Dialog, chx1, fWholeWord);
+		CheckDlgButton(Dialog, chx2, fCase);
+		CheckDlgButton(Dialog, chx3, fWrapAround);
+		return TRUE;
+	case WM_COMMAND:
+		switch (WParam) {
+		case chx1: // Whole word only
+			fWholeWord = IsDlgButtonChecked(Dialog, (int) WParam);
+			return FALSE;
+		case chx2: // Match case
+			fCase = IsDlgButtonChecked(Dialog, (int) WParam);
+			return FALSE;
+		case chx3: // Wrap around
+			fWrapAround = IsDlgButtonChecked(Dialog, (int) WParam);
+			return TRUE;
+		}
+
+		break;
+	}
+
+	return FALSE;
+}
+
 /* ** Notepad command proc - called whenever notepad gets WM_COMMAND
       message.  wParam passed as cmd */
 INT NPCommand(
@@ -881,6 +1051,11 @@ INT NPCommand(
         case M_NEW:
             New(TRUE);
             break;
+
+		case M_NEWWIN:
+
+			NewWindow();
+			break;
 
         case M_OPEN:
             if (CheckSave(FALSE))
@@ -970,63 +1145,70 @@ INT NPCommand(
             }
 
         case M_REPLACE:
-            if( hDlgFind )
+			CopyEditControlSelectionText(hwndEdit, szSearch, ARRAYSIZE(szSearch));
+
+            if (hDlgFind)
             {
-               SetFocus( hDlgFind );
+				SetDlgItemText(hDlgFind, edt1, szSearch);
+				SetFocus(hDlgFind);
             }
             else
             {
-               FR.Flags= FR_HIDEWHOLEWORD | FR_REPLACE;
-               FR.lpstrReplaceWith= szReplace;
-               FR.wReplaceWithLen= CCHKEYMAX;
-               FR.lpstrFindWhat = szSearch;
-               FR.wFindWhatLen  = CCHKEYMAX;
-               hDlgFind = ReplaceText( &FR );
+				FR.Flags			= FR_REPLACE | FR_ENABLETEMPLATE | FR_ENABLEHOOK;
+				FR.lpTemplateName	= MAKEINTRESOURCE(IDD_REPLACEDIALOG);
+				FR.lpfnHook			= FindReplaceHookProc;
+				FR.lpstrReplaceWith	= szReplace;
+				FR.wReplaceWithLen	= CCHKEYMAX;
+				FR.lpstrFindWhat	= szSearch;
+				FR.wFindWhatLen		= CCHKEYMAX;
+				hDlgFind = ReplaceText( &FR );
             }
             break;
 
         case M_FINDNEXT:
             if (szSearch[0])
             {
-               Search(szSearch);
-               break;
+				fReverse = FALSE;
+				Search(szSearch);
+				break;
             }
-            /* else fall thro' a,d bring up "find" dialog */
+            /* else fall through and bring up "find" dialog */
+
+		case M_FINDPREVIOUS:
+			// notepadEx addition
+			if (szSearch[0])
+			{
+				fReverse = TRUE;
+				Search(szSearch);
+				break;
+			}
 
         case M_FIND:
+			CopyEditControlSelectionText(hwndEdit, szSearch, ARRAYSIZE(szSearch));
+
             if (hDlgFind)
             {
-               SetFocus(hDlgFind);
+				SetDlgItemText(hDlgFind, edt1, szSearch);
+				SetFocus(hDlgFind);
             }
             else
             {
-               FR.Flags= FR_DOWN | FR_HIDEWHOLEWORD;
-               FR.lpstrReplaceWith= NULL;
-               FR.wReplaceWithLen= 0;
-               FR.lpstrFindWhat = szSearch;
-               FR.wFindWhatLen  = CCHKEYMAX;
-               hDlgFind = FindText((LPFINDREPLACE)&FR);
+				FR.Flags			= FR_DOWN | FR_ENABLETEMPLATE | FR_ENABLEHOOK;
+				FR.lpTemplateName	= MAKEINTRESOURCE(IDD_FINDDIALOG);
+				FR.lpfnHook			= FindReplaceHookProc;
+				FR.lpstrReplaceWith	= NULL;
+				FR.wReplaceWithLen	= 0;
+				FR.lpstrFindWhat	= szSearch;
+				FR.wFindWhatLen		= CCHKEYMAX;
+				hDlgFind = FindText((LPFINDREPLACE)&FR);
             }
             break;
 
         case M_GOTO:
-            {
-                INT  Result;
-
-                Result= (INT)DialogBox( (HINSTANCE) hInstanceNP,
-                                        MAKEINTRESOURCE(IDD_GOTODIALOG),
-                                        hwndNP,
-                                        GotoDlgProc );
-
-                //
-                // move cursor only if ok pressed and line number ok
-                //
-
-                if( Result == 0 )
-                {
-                    GotoAndScrollInView( lGotoLine );
-                }
-            }
+            DialogBox(	(HINSTANCE) hInstanceNP,
+						MAKEINTRESOURCE(IDD_GOTODIALOG),
+						hwndNP,
+						GotoDlgProc);
             break;
 
         case M_ABOUT:
@@ -1042,6 +1224,7 @@ INT NPCommand(
 			CLSIDFromString(L"{8cec58e7-07a1-11d9-b15e-000d56bfe6ee}", &CLSID_HxHelpPane);
 			IIDFromString(L"{8cec5884-07a1-11d9-b15e-000d56bfe6ee}", &IID_IHxHelpPane);
 
+			// NotepadEx
 			if (SUCCEEDED(CoCreateInstance(&CLSID_HxHelpPane, NULL, CLSCTX_INPROC_SERVER, &IID_IHxHelpPane, &php))) {
 				// Vista/7+ windows help
 				if (!(helpURI = SysAllocString(L"mshelp://Windows/?id=5d18d5fb-e737-4a73-b6cc-dccc63720231"))) break;
@@ -1094,7 +1277,7 @@ INT NPCommand(
             SendMessage (hwndEdit, EM_UNDO, 0, 0L);
             break;
 
-        case M_WW:
+        case M_WW: // word wrap
             style= (!fWrap) ? ES_STD : (ES_STD | WS_HSCROLL);
             if( NpReCreate( style ) )
             {
@@ -1104,39 +1287,6 @@ INT NPCommand(
             {
                 MessageBox(hwndNP, szNoWW, szNN,
                            MB_APPLMODAL | MB_OK | MB_ICONEXCLAMATION);
-            }
-
-            // disable the status bar
-            // Line numbers when wordwrap is on are very confusing for now.  Just turn them
-            // off until we better understand what the user wants to see.
-            if (fWrap)
-            {
-                HMENU hMenu;
-
-                // Uncheck the StatusBar and remove it.
-                fLastStatus= fStatus;      // remember for when wordwrap  gets turned off
-                if( fStatus ) 
-                {
-                    SendMessage(hwnd, WM_COMMAND, M_STATUSBAR, 0L);
-                }
-
-                hMenu = GetMenu(hwndNP);
-                CheckMenuItem (GetSubMenu(hMenu, 3), M_STATUSBAR, MF_UNCHECKED);
-                EnableMenuItem(GetSubMenu(hMenu, 3), M_STATUSBAR, MF_GRAYED);
-            }
-            // enable the status bar
-            else
-            {
-                HMENU hMenu;
-
-                hMenu = GetMenu(hwndNP);
-                EnableMenuItem(GetSubMenu(hMenu, 3), M_STATUSBAR, MF_ENABLED);
-
-                // change the statusbar status to what it was before wordwrap was turned on
-                if( fLastStatus ) 
-                {
-                   SendMessage( hwnd, WM_COMMAND, M_STATUSBAR, 0L);
-                }
             }
 
             break;
@@ -1156,7 +1306,7 @@ INT NPCommand(
             {
                 fStatus = TRUE;
                 NPSize(rcClient.right - rcClient.left, rcClient.bottom - rcClient.top);
-                UpdateStatusBar( TRUE );
+                UpdateStatusBar(TRUE);
                 ShowWindow( hwndStatus, SW_SHOW );
             }
             break;
@@ -1482,11 +1632,16 @@ SaveFilePrompt:
     return (mdResult != IDCANCEL);
 }
 
+// new in notepadex
+// ripped from some shell code somewhere from the edit control
+// forgot exactly where
 BOOL IsBreakChar(
 	WCHAR	wch)
 {
 	CONST WCHAR szBreakChars[] = {
 		0x0009, // TAB
+		0x000A, // NEWLINE
+		0x000D, // CARRIAGE RETURN
 		0x0020, // SPACE
 		0x0021, // IE: !
 		0x0022, // IE: "
@@ -1695,6 +1850,14 @@ BOOL IsBreakChar(
 
 //#define ISDELIMITERW(ch) (((ch) == L' ') || ((ch) == L'\t'))
 
+// CharPrev is slow as fuck bloatware. We don't need it.
+#undef CharPrev
+#define CharPrev(lpszStart, lpszCurrent) max((lpszStart), (lpszCurrent) - 1)
+
+// This function is new in NotepadEx, ripped from some shell code
+// for the edit control.
+// This function is not actually set as the edit control's word
+// break procedure. It is used only for Ctrl+Backspace support.
 INT CALLBACK EditWordBreakProc(
 	LPWSTR	lpszEditText,
 	INT		ichCurrent,
@@ -1735,6 +1898,8 @@ LRESULT CALLBACK EditWndProc(
 		WPARAM		wParam,
 		LPARAM		lParam)
 {
+	// NotepadEx change from some time ago, that I forgot to comment:
+	// Support Ctrl+Backspace to delete a word.
 	if (message == WM_CHAR && wParam == VK_F16) {
 		HLOCAL hBuf;
 		LPWSTR lpszBuf;
@@ -1756,8 +1921,12 @@ LRESULT CALLBACK EditWndProc(
 			WB_LEFT);
 		LocalUnlock(hBuf);
 
+		// The WM_SETREDRAW messages are necessary to avoid briefly flashing
+		// the selection on the edit control.
+		SendMessage(hwnd, WM_SETREDRAW, FALSE, 0);
 		SendMessage(hwnd, EM_SETSEL, dwNewSelStart, dwCurrentSelStart);
 		SendMessage(hwnd, EM_REPLACESEL, TRUE, (LPARAM) L"");
+		SendMessage(hwnd, WM_SETREDRAW, TRUE, 0);
 			
 		return 0;
 	}
@@ -1905,22 +2074,20 @@ WNDPROC FAR NPWndProc(
             {
                 case SIZENORMAL:
                 case SIZEFULLSCREEN:
-
                     // resize the status window.
-                    SendMessage (hwndStatus, WM_SIZE, 0, 0L);
-                    iParts[0] = 2 * (MAKEPOINTS(lParam).x)/4;
-					iParts[1] = 3 * (MAKEPOINTS(lParam).x)/4;
-                    iParts[2] = -1;
+                    SendMessage(hwndStatus, WM_SIZE, 0, 0L);
 
                     // Divide the status window into three parts
-                    SendMessage(hwndStatus, SB_SETPARTS, (WPARAM) sizeof(iParts)/sizeof(INT), (LPARAM) &iParts[0]); 
+					iParts[0] = 2 * (MAKEPOINTS(lParam).x)/4;
+					iParts[1] = 3 * (MAKEPOINTS(lParam).x)/4;
+                    iParts[2] = -1;
+                    SendMessage(hwndStatus, SB_SETPARTS, (WPARAM) sizeof(iParts)/sizeof(INT), (LPARAM) &iParts[0]);
 
                     NPSize(MAKEPOINTS(lParam).x, MAKEPOINTS(lParam).y);
                     break;
 
                 case SIZEICONIC:
                     return (WNDPROC) (DefWindowProc(hwnd, message, wParam, lParam));
-                    break;
                 }
             break;
 
@@ -1986,8 +2153,12 @@ WNDPROC FAR NPWndProc(
                 lpfr = (LPFINDREPLACE)lParam;
                 dwFlags = lpfr->Flags;
 
-                fReverse = (dwFlags & FR_DOWN      ? FALSE : TRUE);
-                fCase    = (dwFlags & FR_MATCHCASE ? TRUE  : FALSE);
+                fReverse	= (dwFlags & FR_DOWN      ? FALSE : TRUE);
+				// NotepadEx: These are no longer required because we are setting
+				// them directly in the find&replace hook procedure.
+                //fCase		= (dwFlags & FR_MATCHCASE ? TRUE  : FALSE);
+				//fWholeWord	= (dwFlags & FR_WHOLEWORD ? TRUE  : FALSE);
+				//fWrapAround = (lpfr->lCustData & 1	  ? TRUE  : FALSE);
 
                 if( dwFlags & FR_FINDNEXT )
                 {
@@ -2037,7 +2208,7 @@ WNDPROC FAR NPWndProc(
                    //
                    SendMessage( hwndEdit, EM_SETSEL, 0, 0 );
                    SendMessage( hwndEdit, EM_SCROLLCARET, 0, 0);
-                   UpdateStatusBar( TRUE );
+                   UpdateStatusBar( TRUE ); // pass TRUE because it's more efficient considering we're at the top
 				}
                 else if (dwFlags & FR_DIALOGTERM)
                     hDlgFind = NULL;   /* invalidate modeless window handle */
@@ -2136,17 +2307,131 @@ INT WINAPI WinMain(
 	return (INT) (msg.wParam);
 }
 
-// WinEventFunc is called whenever the location of the caret changes
-// in the edit window. The function updates the statusbar with the current
-// line number, column of the caret.  This event is called when the mouse is moved.
-// If the caret moves without mouse input, the UpdateStatusBar is called.
-//
-// UpdateStatusBar( TRUE ) is called to force the display being changed.
-
 static DWORD iLastCol;
 static DWORD iLastLine;
+static DWORD iLastSelStart = 0; // NotepadEx
 static DWORD SelRoot;
 static NP_LINETYPE ltLastLineType;
+
+// This function was added for NotepadEx.
+// Given a zero-based character index, return:
+//   - the 1-based real line number
+//   - the 1-based real column number
+VOID GetEditControlRealPosition(
+	IN	HWND	Window,
+	IN	ULONG	CharacterIndex,
+	OUT	PUINT	LineNumber,
+	OUT	PUINT	ColumnNumber)
+{
+	HLOCAL EditControlBufferHandle;
+	PWSTR EditControlBuffer;
+	ULONG Index;
+	UINT LineNumberTemp;
+	UINT ColumnNumberTemp;
+
+	Index = 0;
+	LineNumberTemp = 1;
+	ColumnNumberTemp = 1;
+
+	EditControlBufferHandle = Edit_GetHandle(Window);
+
+	if (!EditControlBufferHandle) {
+		return;
+	}
+
+	EditControlBuffer = (PWSTR) LocalLock(EditControlBufferHandle);
+
+	if (!EditControlBuffer) {
+		return;
+	}
+
+	while (TRUE) {
+		if (EditControlBuffer[Index] == '\0') {
+			break;
+		}
+
+		if (EditControlBuffer[Index] == '\n') {
+			++LineNumberTemp;
+			ColumnNumberTemp = 0;
+		}
+
+		if (Index == CharacterIndex) {
+			break;
+		}
+
+		++Index;
+		++ColumnNumberTemp;
+	}
+
+	LocalUnlock(EditControlBufferHandle);
+
+	*LineNumber = LineNumberTemp;
+	*ColumnNumber = ColumnNumberTemp;
+}
+
+VOID UpdateEditControlRealPosition(
+	IN	HWND	Window,
+	IN	ULONG	CharacterIndex,
+	IN	ULONG	LastCharacterIndex,
+	OUT	PUINT	LineNumber,
+	OUT	PUINT	ColumnNumber)
+{
+	HLOCAL EditControlBufferHandle;
+	PWSTR EditControlBuffer;
+	ULONG Index;
+	ULONG EndIndex;
+	UINT LineNumberDelta;
+	UINT ColumnNumberTemp;
+
+	Index = min(CharacterIndex, LastCharacterIndex);
+	EndIndex = max(CharacterIndex, LastCharacterIndex);
+	LineNumberDelta = 0;
+	ColumnNumberTemp = 0;
+
+	EditControlBufferHandle = Edit_GetHandle(Window);
+
+	if (!EditControlBufferHandle) {
+		return;
+	}
+
+	EditControlBuffer = (PWSTR) LocalLock(EditControlBufferHandle);
+
+	if (!EditControlBuffer) {
+		return;
+	}
+
+	// calculate line number delta by counting the number of \n characters
+	// between the current position and the previous position
+	while (Index < EndIndex) {
+		if (EditControlBuffer[Index] == '\n') {
+			++LineNumberDelta;
+		}
+
+		++Index;
+	}
+
+	// calculate column number - how many chars forward is the last \n?
+	Index = CharacterIndex;
+
+	do {
+		if (EditControlBuffer[Index] == '\n') {
+			break;
+		}
+
+		++ColumnNumberTemp;
+		--Index;
+	} while (Index != -1);
+
+	LocalUnlock(EditControlBufferHandle);
+
+	*ColumnNumber = ColumnNumberTemp;
+	
+	if (CharacterIndex > LastCharacterIndex) {
+		*LineNumber += LineNumberDelta;
+	} else {
+		*LineNumber -= LineNumberDelta;
+	}
+}
 
 VOID UpdateStatusBar( BOOL fForceStatus )
 {
@@ -2158,9 +2443,24 @@ VOID UpdateStatusBar( BOOL fForceStatus )
     // get the current caret position.
 	SendMessage(hwndEdit, EM_GETSEL, (WPARAM) &SelStart, (WPARAM) &SelEnd);
 
-	// the line numbers are 1 based instead 0 based. hence add 1.
-	iLine = (UINT) SendMessage( hwndEdit, EM_LINEFROMCHAR, SelStart, 0 ) + 1;
-    iCol = SelStart - (UINT) SendMessage( hwndEdit, EM_LINEINDEX, iLine-1, 0 ) + 1;
+	if (fWrap) {
+		// NotepadEx change: Support calculating the real cursor position
+		// when word wrap is enabled.
+
+		if (fForceStatus) {
+			// fully recalculate position
+			GetEditControlRealPosition(hwndEdit, SelStart, &iLine, &iCol);
+		} else {
+			// partial recalculation based on last position
+			iLine = iLastLine;
+			iCol = iLastCol;
+			UpdateEditControlRealPosition(hwndEdit, SelStart, iLastSelStart, &iLine, &iCol);
+		}
+	} else {
+		// the line numbers are 1 based instead 0 based. hence add 1.
+		iLine = (UINT) SendMessage( hwndEdit, EM_LINEFROMCHAR, SelStart, 0 ) + 1;
+		iCol = SelStart - (UINT) SendMessage( hwndEdit, EM_LINEINDEX, iLine-1, 0 ) + 1;
+	}
 
 	// 18-08-2022 NotepadEx change
 	// Try to get the actual position of the cursor instead of just the start of the
@@ -2202,8 +2502,15 @@ VOID UpdateStatusBar( BOOL fForceStatus )
 	ltLastLineType = ltLineType;
     iLastCol=  iCol;
     iLastLine= iLine;
+	iLastSelStart = SelStart;
 };
 
+// WinEventFunc is called whenever the location of the caret changes
+// in the edit window. The function updates the statusbar with the current
+// line number, column of the caret.  This event is called when the mouse is moved.
+// If the caret moves without mouse input, the UpdateStatusBar is called.
+//
+// UpdateStatusBar( TRUE ) is called to force the display being changed.
 VOID CALLBACK WinEventFunc(HWINEVENTHOOK hWinEventHook, DWORD event, HWND hwnd, LONG idObject,
                       LONG idChild, DWORD dwEventThread, DWORD dwmsEventTime)
 {
@@ -2305,8 +2612,8 @@ void FAR SetTitle( TCHAR  *sz )
     // set the line ending type displayed to the user upon opening a new
 	// file
 	switch (g_ltOpenedAs) {
-	case LT_WINDOWS:	SetStatusBarText(szWindowsFile, 1); break;
-	case LT_UNIX:		SetStatusBarText(szUnixFile, 1); break;
+	case LT_WINDOWS:	SetStatusBarText(szWindowsFile, 1);	break;
+	case LT_UNIX:		SetStatusBarText(szUnixFile, 1);	break;
 	}
 	// Note: Commenting out the two lines below, and replacing with a call to UpdateStatusBar,
 	// fixes a bug in all official Microsoft versions of Notepad, in which saving the file resets
@@ -2398,21 +2705,17 @@ VOID NpResetMenu( HWND hwnd )
         mfcc= MF_ENABLED;
     }
 
-    EnableMenuItem( GetSubMenu(hMenu,1), M_FIND,     mfcc );
-    EnableMenuItem( GetSubMenu(hMenu,1), M_FINDNEXT, mfcc );
-
-
-    // enable 'goto' iff wordwrap is off;  MLE doesn't give good results if word wrap on
-
-    EnableMenuItem(GetSubMenu(hMenu, 1), M_GOTO, fWrap ? MF_GRAYED : MF_ENABLED );
+    EnableMenuItem( GetSubMenu(hMenu,1), M_FIND,			mfcc );
+    EnableMenuItem( GetSubMenu(hMenu,1), M_FINDNEXT,		mfcc );
+	EnableMenuItem( GetSubMenu(hMenu,1), M_FINDPREVIOUS,	mfcc ); // NotepadEx
+	EnableMenuItem( GetSubMenu(hMenu,1), M_REPLACE,         mfcc ); // NotepadEx
+	EnableMenuItem( GetSubMenu(hMenu,1), M_GOTO,			mfcc ); // NotepadEx
 
     // enable Undo only if editcontrol says we can do it.
-
     fCanUndo = (BOOL) SendMessage(hwndEdit, EM_CANUNDO, 0, 0L);
     EnableMenuItem(GetSubMenu(hMenu, 1), M_UNDO, fCanUndo ? MF_ENABLED : MF_GRAYED);
 
     // check the word wrap item correctly
-
     CheckMenuItem(GetSubMenu(hMenu, 2), M_WW, fWrap ? MF_CHECKED : MF_UNCHECKED);
 
 	// tab stops/tab width menu
@@ -2693,7 +2996,7 @@ INT_PTR CALLBACK GotoDlgProc(HWND hDlg,UINT message,WPARAM wParam,LPARAM lParam)
 
             switch (LOWORD(wParam))
             {
-                UINT CharIndex;
+                BOOLEAN Success;
 
                 case IDC_GOTO:
                     return TRUE;
@@ -2711,27 +3014,32 @@ INT_PTR CALLBACK GotoDlgProc(HWND hDlg,UINT message,WPARAM wParam,LPARAM lParam)
                     // see if valid line number
                     //
 
-                    CharIndex= (UINT)SendMessage( hwndEdit,
-                                            EM_LINEINDEX,
-                                            lGotoLine-1,
-                                            0);
-                    if( lGotoLine > 0 && CharIndex != -1 )
-                    {
+					Success = GotoAndScrollInView(lGotoLine);
+
+                    if (Success) {
                         EndDialog(hDlg, 0);  // successfull
                         return TRUE;
                     }
 
                     //
-                    // Invalid line number
-                    // warning user and set to reasonable value
+                    // Invalid line number - warn the user.
+					// NotepadEx change: Use edit control balloon tips on Windows
+					// versions that support it (XP and up).
                     //
 
-                    MessageBox( hDlg, szLineTooLarge, szLineError, MB_OK );
+					if (*(PULONG)0x7FFE026C > 6 || *(PULONG)0x7FFE0270 > 0) {
+						EDITBALLOONTIP BalloonTip;
 
-                    LineNum= (UINT)SendMessage( hwndEdit, EM_GETLINECOUNT, 0, 0 );
-                    wsprintf(szBuf, TEXT("%d"), LineNum);
-                    SetDlgItemText( hDlg, IDC_GOTO, szBuf );
-                    SetFocus( hDlg );
+						BalloonTip.cbStruct	= sizeof(BalloonTip);
+						BalloonTip.pszTitle	= NULL;
+						BalloonTip.pszText	= szLineTooLarge;
+						BalloonTip.ttiIcon	= TTI_NONE;
+						Edit_ShowBalloonTip(GetDlgItem(hDlg, IDC_GOTO), &BalloonTip);
+					} else {
+						MessageBox(hDlg, szLineTooLarge, szLineError, MB_OK);
+						SetFocus(hDlg);
+					}
+
                     break;
 
                 case IDCANCEL :

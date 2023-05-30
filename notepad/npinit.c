@@ -34,9 +34,6 @@ static INT g_WPtop,g_WPleft,g_WPDX,g_WPDY;   /* initial window positions        
  * units (cm for example) and convert on input and output.
  */
 
-/* name of section to save into -- never internationalize */
-#define OURKEYNAME TEXT("Software\\Microsoft\\Notepad")
-
 // RegWriteInt - write an integer to the registry
 
 VOID RegWriteInt( HKEY hKey, PTCHAR pszKey, INT iValue )
@@ -138,6 +135,10 @@ VOID SaveGlobals(VOID)
 	RegWriteInt( hKey, TEXT("iTabStops"),		 iTabStops);
     RegWriteInt( hKey, TEXT("fWrap"),            fWrap);
     RegWriteInt( hKey, TEXT("StatusBar"),        fStatus);
+	RegWriteInt( hKey, TEXT("fWholeWord"),		 fWholeWord);
+	RegWriteInt( hKey, TEXT("fCase"),			 fCase);
+	RegWriteInt( hKey, TEXT("fWrapAround"),		 fWrapAround);
+
     RegWriteInt( hKey, TEXT("fSaveWindowPositions"),fSaveWindowPositions );
 
     RegWriteString( hKey, TEXT("lfFaceName"), FontStruct.lfFaceName);
@@ -234,6 +235,9 @@ VOID GetGlobals( VOID )
 	iTabStops=	RegGetInt( hKey, TEXT("iTabStops"),	 32);
     fWrap=      RegGetInt( hKey, TEXT("fWrap"),      0);
     fStatus=    RegGetInt( hKey, TEXT("StatusBar"),  0);
+	fWholeWord=	RegGetInt( hKey, TEXT("fWholeWord"), 0);
+	fCase=		RegGetInt( hKey, TEXT("fCase"),		 0);
+	fWrapAround=RegGetInt( hKey, TEXT("fWrapAround"),0);
     fSaveWindowPositions= RegGetInt( hKey, TEXT("fSaveWindowPositions"), 0 );
 
     // if page settings not in registry, we will use defaults
@@ -253,6 +257,10 @@ VOID GetGlobals( VOID )
     g_WPDX=   RegGetInt( hKey, TEXT("iWindowPosDX"), CW_USEDEFAULT );
     g_WPDY=   RegGetInt( hKey, TEXT("iWindowPosDY"), CW_USEDEFAULT );
     
+	// put CW_USEDEFAULT back in the registry, so that if the user opens
+	// more notepad windows they will be cascaded. (NotepadEx change)
+	RegWriteInt(hKey, L"iWindowPosX", CW_USEDEFAULT);
+	RegWriteInt(hKey, L"iWindowPosY", CW_USEDEFAULT);
 
     fMLE_is_broken= RegGetInt( hKey, TEXT("fMLE_is_broken"), FALSE );  // assume edit control works
 
@@ -745,7 +753,6 @@ INT FAR NPInit (HINSTANCE hInstance, HINSTANCE hPrevInstance,
     INT    iSta;
     WINDOWPLACEMENT wp;    /* structure to place window at the correct position */
     INT    iParts[3];
-    HMENU  hMenu;          // handle to the menu.
 
     /* determine the message number to be used for communication with
      * Find dialog
@@ -797,7 +804,7 @@ INT FAR NPInit (HINSTANCE hInstance, HINSTANCE hPrevInstance,
 
     GetGlobals();
 
-    hwndNP= CreateWindow(szNotepad, 
+    hwndNP= CreateWindow(szNotepad,
                          TEXT(""),
                          WS_OVERLAPPED | WS_CAPTION     | WS_SYSMENU     |
                          WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_CLIPCHILDREN,
@@ -825,7 +832,7 @@ INT FAR NPInit (HINSTANCE hInstance, HINSTANCE hPrevInstance,
 
     // g_WPDX and g_WPDY are CW_USEDEFAULT when notepad is started for the
     // first time on the user machine.
-    if (g_WPDX != CW_USEDEFAULT && g_WPDY != CW_USEDEFAULT)
+    if (g_WPleft != CW_USEDEFAULT && g_WPDX != CW_USEDEFAULT && g_WPDY != CW_USEDEFAULT)
     {
         memset(&wp, 0, sizeof(wp));
         wp.length = sizeof(wp);        
@@ -846,6 +853,9 @@ INT FAR NPInit (HINSTANCE hInstance, HINSTANCE hPrevInstance,
 
     GetClientRect( hwndNP, (LPRECT) &rcT1 );
 
+	// Btw, the Windows 10 notepad omits WS_EX_CLIENTEDGE for this call
+	// and all subsequent creations of the edit window. But I think that
+	// looks quite bad on Win7, so the existing behavior will be retained.
     if (!(hwndEdit = CreateWindowEx(WS_EX_CLIENTEDGE,
                      TEXT("Edit"), TEXT(""),
                      (fWrap) ? ES_STD : (ES_STD | WS_HSCROLL),
@@ -857,12 +867,25 @@ INT FAR NPInit (HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	DefEditWindowProc = (WNDPROC) SetWindowLongPtr(hwndEdit, GWLP_WNDPROC, (LONG_PTR) EditWndProc);
 
     // create a status window.
-    hwndStatus = CreateStatusWindow ((fStatus?WS_VISIBLE:0)|WS_BORDER|WS_CHILD|WS_CLIPSIBLINGS, TEXT(""), hwndNP, ID_STATUS_WINDOW);
-    if ( !hwndStatus )
-        return FALSE;
-    UpdateStatusBar( TRUE );
+    //hwndStatus = CreateStatusWindow ((fStatus?WS_VISIBLE:0)|WS_BORDER|WS_CHILD|WS_CLIPSIBLINGS, TEXT(""), hwndNP, ID_STATUS_WINDOW);
 
-    GetClientRect( hwndStatus, (LPRECT) &rcStatus );
+	// NotepadEx: Using the WS_EX_COMPOSITED extended window style greatly
+	// helps with flickering on Vista+, and works especially great when
+	// DWM compositing is enabled.
+	// Windows 2000 compatibility is not affected.
+	hwndStatus = CreateWindowEx(
+		WS_EX_COMPOSITED,
+		STATUSCLASSNAME,
+		NULL,
+		(fStatus ? WS_VISIBLE : 0) | WS_BORDER | WS_CHILD | WS_CLIPSIBLINGS,
+		0, 0, 0, 0,
+		hwndNP,
+		(HMENU) ID_STATUS_WINDOW,
+		hInstance,
+		NULL);
+
+    UpdateStatusBar(TRUE);
+    GetClientRect(hwndStatus, (LPRECT) &rcStatus);
 
     // determine height of statusbar window and save...
     dyStatus = rcStatus.bottom - rcStatus.top;
@@ -878,13 +901,6 @@ INT FAR NPInit (HINSTANCE hInstance, HINSTANCE hPrevInstance,
     // handle word wrap now if set in registry
 
     SendMessage( hwndEdit, EM_FMTLINES, fWrap, 0L );  // tell MLE
-
-	// if wordwrap, disable the statusbar
-    if (fWrap)
-    {
-        hMenu = GetMenu(hwndNP);
-        EnableMenuItem(GetSubMenu(hMenu, 3), M_STATUSBAR, MF_GRAYED);
-    }
 
     FontStruct.lfHeight= -MulDiv(iPointSize,
                                  GetDeviceCaps(hDisplayDC,LOGPIXELSY),

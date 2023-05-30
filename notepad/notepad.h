@@ -2,7 +2,11 @@
 
 #define NOCOMM
 #define NOSOUND
-#include <windows.h>
+#include <Windows.h>
+#include <WindowsX.h>
+
+#define STATIC static
+#define CONST const
 
 #ifndef RC_INVOKED
 #  include <ole2.h>
@@ -57,6 +61,8 @@ typedef enum _NP_LINETYPE {
 #define IDD_PAGESETUP        12
 #define IDD_SAVEDIALOG       13    // template for save dialog
 #define IDD_GOTODIALOG       14    // goto line number dialog
+#define IDD_FINDDIALOG		 15
+#define IDD_REPLACEDIALOG	 16
 
 // Control IDs 
 
@@ -68,12 +74,13 @@ typedef enum _NP_LINETYPE {
 
 // File
 #define M_NEW                1
-#define M_OPEN               2
-#define M_SAVE               3
-#define M_SAVEAS             4
-#define M_PAGESETUP          5
-#define M_PRINT              6
-#define M_EXIT               7
+#define M_NEWWIN			 2
+#define M_OPEN               3
+#define M_SAVE               4
+#define M_SAVEAS             5
+#define M_PAGESETUP          6
+#define M_PRINT              7
+#define M_EXIT               8
 
 // Edit
 #define M_UNDO               16
@@ -83,11 +90,12 @@ typedef enum _NP_LINETYPE {
 #define M_CLEAR              WM_CLEAR
 #define M_FIND               21
 #define M_FINDNEXT           22
-#define M_REPLACE            23
-#define M_GOTO               24
-#define M_SELECTALL          25
-#define M_DATETIME           26
-#define M_STATUSBAR          27
+#define M_FINDPREVIOUS		 23
+#define M_REPLACE            24
+#define M_GOTO               25
+#define M_SELECTALL          26
+#define M_DATETIME           27
+#define M_STATUSBAR          28
 
 // Format
 #define M_WW                 32
@@ -207,11 +215,16 @@ typedef enum _NP_LINETYPE {
  */
 #define ES_STD (WS_CHILD|WS_VSCROLL|WS_VISIBLE|ES_MULTILINE|ES_NOHIDESEL)
 
+/* name of reg key to save into -- never internationalize */
+#define OURKEYNAME TEXT("Software\\Microsoft\\Notepad")
+
 /* EXTERN decls for data */
 extern NP_FILETYPE fFileType;     /* Flag indicating the type of text file */
 
 extern BOOL fCase;                /* Flag specifying case sensitive search */
 extern BOOL fReverse;             /* Flag for direction of search */
+extern BOOL fWholeWord;
+extern BOOL fWrapAround;
 extern TCHAR szSearch[];
 extern HWND hDlgFind;             /* handle to modeless FindText window */
 
@@ -344,9 +357,10 @@ INT_PTR CALLBACK GotoDlgProc(HWND hDlg,UINT message,WPARAM wParam,LPARAM lParam)
 VOID CALLBACK WinEventFunc(HWINEVENTHOOK hWinEventHook, DWORD event, HWND hwnd, LONG idObject,
                       LONG idChild, DWORD dwEventThread, DWORD dwmsEventTime);
 
+VOID NewWindow(VOID);
 
 NP_FILETYPE fDetermineFileType(LPBYTE lpFileContents, UINT iSize);
-VOID GotoAndScrollInView( INT OneBasedLineNumber );
+BOOLEAN GotoAndScrollInView( INT OneBasedLineNumber );
 void NPSize (int cxNew, int cyNew);
 
 
@@ -365,13 +379,14 @@ VOID FAR  AlertUser_FileFail( LPTSTR szFileName );
 INT FAR  NPInit (HANDLE hInstance, HANDLE hPrevInstance,
                  LPTSTR lpCmdLine, INT cmdShow);
 void SaveGlobals( VOID );
+VOID RegWriteInt( HKEY hKey, PTCHAR pszKey, INT iValue );
 
 /* procs in npmisc.c */
 INT FAR  FindDlgProc (HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 BOOL     Search (TCHAR *szSearch);
 INT FAR  AboutDlgProc (HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 BOOL FAR NpReCreate (LONG style);
-LPTSTR   ForwardScan (LPTSTR lpSource, LPTSTR lpSearch, BOOL fCaseSensitive);
+LPTSTR ForwardScan(LPTSTR lpHaystackBegin, LPTSTR lpHaystackSearch, LPTSTR lpNeedle, BOOL fCaseSensitive);
 
 
 /* procs in npprint.c */

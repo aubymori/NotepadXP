@@ -266,9 +266,13 @@ VOID PrintLogFont( LOGFONT lf )
 // Returns: valid HDC or INVALID_HANDLE_VALUE if error.
 //
 
+#undef PrintDlgEx
+typedef HRESULT (WINAPI *PRINTDLGEXPROC)(IN OUT LPPRINTDLGEX lppd);
+
 HDC GetPrinterDCviaDialog( VOID )
 {
-    PRINTDLGEX pdTemp;
+	PRINTDLGEXPROC PrintDlgEx;
+    PRINTDLGEX pdexTemp;
     HDC hDC;
     HRESULT hRes;
 
@@ -287,31 +291,31 @@ HDC GetPrinterDCviaDialog( VOID )
     // Initialize the dialog structure
     //
 
-    ZeroMemory( &pdTemp, sizeof(pdTemp) );
+    ZeroMemory( &pdexTemp, sizeof(pdexTemp) );
 
-    pdTemp.lStructSize= sizeof(pdTemp);
+    pdexTemp.lStructSize= sizeof(pdexTemp);
 
-    pdTemp.hwndOwner= hwndNP;
-    pdTemp.nStartPage= START_PAGE_GENERAL;
+    pdexTemp.hwndOwner= hwndNP;
+    pdexTemp.nStartPage= START_PAGE_GENERAL;
     
     // FEATURE: We turn off multiple copies seen 'notepad' doesn't do it.
     //          But this will work on many print drivers esp. if using EMF printing.
     //          We may want to add our own code to do the multiple copies
 
-    pdTemp.Flags= PD_NOPAGENUMS  | PD_RETURNDC | PD_NOCURRENTPAGE |
+    pdexTemp.Flags= PD_NOPAGENUMS | PD_RETURNDC | PD_NOCURRENTPAGE |
                   PD_USEDEVMODECOPIESANDCOLLATE  |
-                  PD_NOSELECTION | 0;
+                  PD_NOSELECTION;
 
     // if use set printer in PageSetup, use it here too.
 
     if( g_PageSetupDlg.hDevMode )
     {
-        pdTemp.hDevMode= g_PageSetupDlg.hDevMode;
+        pdexTemp.hDevMode= g_PageSetupDlg.hDevMode;
     }
 
     if( g_PageSetupDlg.hDevNames )
     {
-        pdTemp.hDevNames= g_PageSetupDlg.hDevNames;
+        pdexTemp.hDevNames= g_PageSetupDlg.hDevNames;
     }
 
 
@@ -319,21 +323,50 @@ HDC GetPrinterDCviaDialog( VOID )
     // let user select printer
     //
 
-    hRes= PrintDlgEx( &pdTemp );
+	PrintDlgEx = (PRINTDLGEXPROC) GetProcAddress(GetModuleHandle(L"comdlg32"), "PrintDlgExW");
+	
+	if (PrintDlgEx) {
+		hRes= PrintDlgEx( &pdexTemp );
+	} else {
+		// NotepadEx addition: For NT4 compatibility.
+		// NT4 does not have PrintDlgEx, only PrintDlg.
+		PRINTDLG pdTemp;
+		BOOL PrintDlgReturn;
+
+		RtlZeroMemory(&pdTemp, sizeof(pdTemp));
+		pdTemp.lStructSize		= sizeof(pdTemp);
+		pdTemp.hwndOwner		= pdexTemp.hwndOwner;
+		pdTemp.hDevMode			= pdexTemp.hDevMode;
+		pdTemp.hDevNames		= pdexTemp.hDevNames;
+		pdTemp.Flags			= pdexTemp.Flags & ~PD_NOCURRENTPAGE;
+		PrintDlgReturn = PrintDlg(&pdTemp);
+
+		if (!PrintDlgReturn) {
+			// Either canceled by user or some error occurred.
+			hRes = E_FAIL;
+		} else {
+			// Success. Copy values to pdexTemp
+			hRes = S_OK;
+			pdexTemp.dwResultAction	= PD_RESULT_PRINT;
+			pdexTemp.hDC			= pdTemp.hDC;
+			pdexTemp.hDevMode		= pdTemp.hDevMode;
+			pdexTemp.hDevNames		= pdTemp.hDevNames;
+		}
+	}
 
     //
     // get DC if valid return
     //
 
-    hDC= INVALID_HANDLE_VALUE;
+    hDC = (HDC) INVALID_HANDLE_VALUE;
 
     if( hRes == S_OK )
     {
-        if( (pdTemp.dwResultAction == PD_RESULT_PRINT) || (pdTemp.dwResultAction == PD_RESULT_APPLY) )
+        if( (pdexTemp.dwResultAction == PD_RESULT_PRINT) || (pdexTemp.dwResultAction == PD_RESULT_APPLY) )
         {
-            if( pdTemp.dwResultAction == PD_RESULT_PRINT )
+            if( pdexTemp.dwResultAction == PD_RESULT_PRINT )
             {
-                hDC= pdTemp.hDC;
+                hDC= pdexTemp.hDC;
             }
             
             //
@@ -348,8 +381,8 @@ HDC GetPrinterDCviaDialog( VOID )
             }
 
             // change devmode if user pressed print or apply
-            g_PageSetupDlg.hDevMode= pdTemp.hDevMode;
-            g_PageSetupDlg.hDevNames= pdTemp.hDevNames;
+            g_PageSetupDlg.hDevMode= pdexTemp.hDevMode;
+            g_PageSetupDlg.hDevNames= pdexTemp.hDevNames;
         }       
     }
 
@@ -1240,7 +1273,7 @@ void PrintIt(PRINT_DIALOG_TYPE type)
                            FORMAT_MESSAGE_FROM_SYSTEM,
                            NULL,
                            iError,
-                           GetUserDefaultUILanguage(),
+                           0,
                            msg,  // where message will end up
                            CharSizeOf(msg), NULL ) )
         {

@@ -17,19 +17,40 @@
 // 1, 1, 0, 0 -> First NotepadEx version
 // 1, 1, 1, 0 -> restore WinXP compatibility
 // 1, 1, 2, 0 -> restore "View Help" button functionality on XP
+//
 // 1, 1, 3, 0 -> statically link MSVCR100.DLL - more suitable for system NP replacement
 //               bug fix for handling non-ASCII characters in Unix line ending files
+//
 // 1, 1, 4, 0 -> bug fix for handling files with more carriage returns than line feeds
 // 1, 2, 0, 0 -> remove CRT dependency and add Windows 2000 support
 // 1, 2, 1, 0 -> add configuration option to change tab width
+//
 // 1, 2, 2, 0 -> add Ctrl+Backspace support, reduce edit control flicker on XP+,
 //               add dirty indicator in title bar, changed selection line/column display,
 //				 remove "Bush hid the facts" bug,
 //				 add Ctrl+Shift+S shortcut for Save As
+//
+// 1, 3, 0, 0 -> fix a minor bug in Ctrl+Backspace support.
+//               eliminate flicker during Ctrl+Backspace operation.
+//               add support for "Find Previous" menu item (Shift+F3).
+//				 add support for "Whole word only" in find/replace.
+//				 add support for "Wrap around" in find/replace.
+//               allow word wrap together with status bar
+//
+// 1, 3, 0, 1 -> save and restore Find&Replace settings from the registry.
+//               improve algorithm used for word wrap + status bar
+//				 make goto dialog work with word wrap
+//               fix bug with tab width setting + word wrap/status bar
+//               eliminate flicker during window resize (spurious InvalidateRect call)
+//				 reduce status bar flicker during window resize (WS_EX_COMPOSITED)
+//               disable all find/replace and goto menu items when no text in the notepad
+//               implement Ctrl+Shift+N shortcut & menu item for new window
+//               make new notepad windows open cascaded
+//               
 // Note: PRODUCTVERSION == FILEVERSION
 1 VERSIONINFO
-	FILEVERSION 1, 2, 2, 0
-	PRODUCTVERSION 1, 2, 2, 0
+	FILEVERSION 1, 3, 0, 1
+	PRODUCTVERSION 1, 3, 0, 1
 	FILEOS VOS_NT_WINDOWS32
 	FILETYPE VFT_APP
 BEGIN
@@ -37,12 +58,12 @@ BEGIN
 		BLOCK "040904B0" {
 			VALUE "Comments", "https://github.com/vxiiduu/NotepadEx"
 			VALUE "FileDescription", "Notepad"
-			VALUE "FileVersion", "1.2.2.0"
+			VALUE "FileVersion", "1.3.0.1"
 			VALUE "InternalName", "Notepad"
 			VALUE "LegalCopyright", "https://github.com/vxiiduu/NotepadEx"
 			VALUE "OriginalFilename", "NOTEPAD.EXE"
 			VALUE "ProductName", "NotepadEx"
-			VALUE "ProductVersion", "1.2.2.0"
+			VALUE "ProductVersion", "1.3.0.1"
 		}
 	}
 
@@ -58,6 +79,7 @@ BEGIN
     POPUP   "&File"
         BEGIN
             MENUITEM    "&New\tCtrl+N",							M_NEW
+			MENUITEM	"New &Window\tCtrl+Shift+N",			M_NEWWIN
             MENUITEM    "&Open...\tCtrl+O",						M_OPEN
             MENUITEM    "&Save\tCtrl+S",						M_SAVE
             MENUITEM    "Save &As...\tCtrl+Shift+S",			M_SAVEAS
@@ -79,6 +101,7 @@ BEGIN
             MENUITEM    SEPARATOR
             MENUITEM    "&Find...\tCtrl+F",     M_FIND
             MENUITEM    "Find &Next\tF3",       M_FINDNEXT
+			MENUITEM	"Find Pre&vious\tShift+F3", M_FINDPREVIOUS
             MENUITEM    "&Replace...\tCtrl+H",  M_REPLACE
 /*
             The hotkey used for replace is CTRL-H in most of the editors, and hence though 
@@ -121,6 +144,7 @@ END
 MainAcc ACCELERATORS PRELOAD DISCARDABLE
 BEGIN
     "N",       M_NEW,      VIRTKEY, CONTROL
+	"N",	   M_NEWWIN,   VIRTKEY, CONTROL, SHIFT
     "O",       M_OPEN,     VIRTKEY, CONTROL
     "S",       M_SAVE,     VIRTKEY, CONTROL
 	"S",       M_SAVEAS,   VIRTKEY, CONTROL, SHIFT
@@ -128,6 +152,7 @@ BEGIN
     VK_INSERT, M_COPY,     VIRTKEY, CONTROL
     VK_F1,     M_HELP,     VIRTKEY
     VK_F3,     M_FINDNEXT, VIRTKEY
+	VK_F3,	   M_FINDPREVIOUS, VIRTKEY, SHIFT
     VK_F5,     M_DATETIME, VIRTKEY
     "G",       M_GOTO,     VIRTKEY, CONTROL
     "F",       M_FIND    , VIRTKEY, CONTROL, NOINVERT
@@ -150,6 +175,7 @@ BEGIN
     VK_INSERT, M_COPY,     VIRTKEY, CONTROL
     VK_F1,     M_HELP,     VIRTKEY
     VK_F3,     M_FINDNEXT, VIRTKEY
+	VK_F3,	   M_FINDPREVIOUS, VIRTKEY, SHIFT
     VK_F5,     M_DATETIME, VIRTKEY
     "G",       M_GOTO,     VIRTKEY, CONTROL
     "F",       M_FIND,     VIRTKEY, CONTROL, NOINVERT
