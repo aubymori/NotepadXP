@@ -1,6 +1,20 @@
 This is a modified version of Windows Notepad, based on the original source code for
-Notepad. It adds a feature which was introduced in Windows 10 - that is, the support
-for Unix-style line endings.
+Notepad. It adds several features of the Windows 10 notepad that aren't available
+for users of earlier versions of Windows, as well as some new features and enhancements:
+
+- Unix (LF) line ending support
+- Option to change the tab width from the default of 8 to either 2 or 4
+- Allow deleting a word using Ctrl+Backspace or Ctrl+Delete
+- Eliminate the well-known "Bush hid the facts" glitch
+- Add Ctrl+Shift+S shortcut to open the Save As menu
+- Add Ctrl+Shift+N shortcut to open a new Notepad window
+- Add an asterisk indicator in the title bar to indicate unsaved changes
+- Add "Find Previous" menu item
+- Improved search features: "Whole word only" and "Wrap around"
+- Search options are memorized across searches and app restarts
+- Allow Word Wrap + Status Bar together
+- Allow "Goto..." function when word wrap is enabled
+- Cascade new Notepad windows when an existing instance of Notepad is open
 
 Here is an example screenshot of how it works, which is essentially the same as how it
 does in Windows 10.
