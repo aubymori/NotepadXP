@@ -16,6 +16,9 @@ for users of earlier versions of Windows, as well as some new features and enhan
 - Allow "Goto..." function when word wrap is enabled
 - Cascade new Notepad windows when an existing instance of Notepad is open
 
+NotepadEx may replace your system Notepad - simply take ownership of, and replace the
+notepad.exe from %windir%, %windir%\System32, and %windir%\SysWOW64 (if applicable).
+
 Here is an example screenshot of how it works, which is essentially the same as how it
 does in Windows 10.
 
