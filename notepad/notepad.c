@@ -3,9 +3,6 @@
  *   Copyright (C) 1984-2001 Microsoft Inc.
  */
 
-// Without this the GUI elements will be ugly and look like win95
-#pragma comment(linker,"\"/manifestdependency:type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
-
 #include "precomp.h"
 //#include <HtmlHelp.h>
 
@@ -1497,8 +1494,6 @@ void doDrop (WPARAM wParam, HWND hwnd)
     DragFinish ((HANDLE)wParam);  /* Delete structure alocated for WM_DROPFILES*/
 }
 
-typedef HRESULT (WINAPI *TDI)(const TASKDIALOGCONFIG *, int *, int *, BOOL *);
-
 /* ** if notepad is dirty, check to see if user wants to save contents */
 BOOL FAR CheckSave (BOOL fSysModal)
 {
@@ -1507,14 +1502,6 @@ BOOL FAR CheckSave (BOOL fSysModal)
     TCHAR *pszFileName;
 	INT iAllocSize;                   // size needed for message
     TCHAR*  pszMessage;               // combined message
-	TDI __TaskDialogIndirect;
-	TASKDIALOGCONFIG tdc;
-	
-	TASKDIALOG_BUTTON tdButtons[] = {
-		{IDYES, TEXT("Save")},
-		{IDNO, TEXT("Don't Save")},
-	};
-	ZeroMemory(&tdc, sizeof(tdc));
 
 /* If it's untitled and there's no text, don't worry about it */
     if (fUntitled && !SendMessage (hwndEdit, WM_GETTEXTLENGTH, 0, (LPARAM)0))
@@ -1527,34 +1514,10 @@ BOOL FAR CheckSave (BOOL fSysModal)
        else
            pszFileName= szFileName;
 
-       // put up message box - XP style or Vista style depending on whether it is available
-	   if ((__TaskDialogIndirect = (TDI) GetProcAddress(GetModuleHandleA("COMCTL32.DLL"), "TaskDialogIndirect")) == NULL) {
-		   // use XP style MessageBox
-		   fInSaveAsDlg= TRUE;     // inform wm_queryendsession that we are trying to save
-		   mdResult= AlertBox(hwndNP, szNN, szSCBC, pszFileName,
-                              (WORD)((fSysModal ? MB_SYSTEMMODAL :
-                              MB_APPLMODAL)|MB_YESNOCANCEL|MB_ICONEXCLAMATION));
-	   } else {
-		   // use Task Dialog like in Vista and up
-		   iAllocSize= (lstrlen(szSCBC) + (pszFileName ? lstrlen(pszFileName) : 0) + 1 ) * sizeof(TCHAR);
-		   pszMessage= (TCHAR*) LocalAlloc( LPTR, iAllocSize );
-
-	       if( pszMessage ) {
-		       MergeStrings( szSCBC, pszFileName, pszMessage );
-           } else {
-		       pszMessage = szSCBC;
-           }
-	       tdc.cbSize = sizeof(tdc);
-	       tdc.hwndParent = hwndNP;
-	       tdc.hInstance = (HINSTANCE) hInstanceNP;
-	       tdc.pszWindowTitle = szNN;
-	       tdc.pszMainInstruction = pszMessage;
-	       tdc.dwCommonButtons = TDCBF_CANCEL_BUTTON;
-	       tdc.cButtons = 2;
-	       tdc.pButtons = tdButtons;
-	       __TaskDialogIndirect(&tdc, &mdResult, NULL, NULL);
-	       if (pszMessage != szSCBC) LocalFree( (HLOCAL) pszMessage );
-	   }
+	    fInSaveAsDlg= TRUE;     // inform wm_queryendsession that we are trying to save
+	    mdResult= AlertBox(hwndNP, szNN, szSCBC, pszFileName,
+                            (WORD)((fSysModal ? MB_SYSTEMMODAL :
+                            MB_APPLMODAL)|MB_YESNOCANCEL|MB_ICONEXCLAMATION));
 
        fInSaveAsDlg= FALSE;
 

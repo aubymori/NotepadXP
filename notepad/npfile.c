@@ -400,9 +400,6 @@ CleanUp:
 
 } // end of SaveFile()
 
-// TaskDialog function pointer
-typedef HRESULT (WINAPI *TD)(HWND, HINSTANCE, PCWSTR, PCWSTR, PCWSTR, TASKDIALOG_COMMON_BUTTON_FLAGS, PCWSTR, int *);
-
 /* Read contents of file from disk.
  * Do any conversions required.
  * File is already open, referenced by handle fp

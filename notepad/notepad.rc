@@ -197,7 +197,7 @@ BEGIN
     IDS_MERGE1       "%%"
     IDS_DISKERROR   "Cannot open the %% file.\n\nMake sure a disk is in the drive you specified."
     IDS_FNF         "Cannot find the %% file.\n\nDo you want to create a new file?"
-    IDS_SCBC        "Do you want to save changes to %%?"
+    IDS_SCBC        "The text in the %% file has changed.\n\nDo you want to save the changes?"
     IDS_UNTITLED    "Untitled"
     IDS_NOTEPAD     " - Notepad"
     IDS_CFS         "Cannot find ""%%"""
