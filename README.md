@@ -22,7 +22,7 @@ notepad.exe from %windir%, %windir%\System32, and %windir%\SysWOW64 (if applicab
 Here is an example screenshot of how it works, which is essentially the same as how it
 does in Windows 10.
 
-![Example screenshot](https://raw.githubusercontent.com/vxiiduu/NotepadEx/main/screenshot.png)
+![Example screenshot](screenshot.png)
 
 Additionally to the Unix line endings support, NotepadEx converts the XP code-base to
 use Vista/7 features, such as task dialogs, common file dialogs (aka "new style open dialog"),
