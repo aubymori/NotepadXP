@@ -1,5 +1,5 @@
-.vs/**
-x64/**
-Win32/**
-Release/**
-Debug/**
+Release/
+Debug/
+x64/
+.vs/
+*.user
