@@ -786,143 +786,57 @@ BOOL NPOpenSave(
 	_Out_ LPTSTR szNewName,
 	_In_ SIZE_T BufferSize)
 {
-	IFileDialog *pfd = NULL;
+	if (fInSaveAsDlg) {
+		OFN.lpstrFile       = szNewName;
+        OFN.lpstrTitle      = szSaveCaption;
+        /* Added OFN_PATHMUSTEXIST to eliminate problems in SaveFile.
+            * 12 February 1991    clarkc
+            */
+        OFN.Flags = OFN_HIDEREADONLY     | OFN_OVERWRITEPROMPT |
+                    OFN_NOREADONLYRETURN | OFN_PATHMUSTEXIST   |
+                    OFN_EXPLORER         |
+                    OFN_ENABLESIZING     |
+                    OFN_ENABLETEMPLATE   | OFN_ENABLEHOOK;
 
-	if (SUCCEEDED(CoCreateInstance(fInSaveAsDlg ? &CLSID_FileSaveDialog : &CLSID_FileOpenDialog,
-								   NULL, CLSCTX_INPROC_SERVER, &IID_IFileDialog, &pfd))) {
-		// use new style dialog (vista or win7)
-		IShellItem *psiResult = NULL;
-		IFileDialogEvents *pfde = NULL;
-		DWORD dwCookie;
-		DWORD dwSelectedEncoding;
-		FILEOPENDIALOGOPTIONS dwFlags = 0;
-		LPWSTR szName = NULL;
-		COMDLG_FILTERSPEC filterFileExt[] = {
-//			{L"Text", L"*.ahk;*.asc;*.asm;*.bas;*.bat;*.c;*.c++;*.cpp;*.cc;*.cfg;*.cmd;*.cs;*.css;*.csv;*.def;*.dlg;*.f03;*.f08;*.f18;*.f4;*.f77;*.f90;*.f95;*.for;*.go;*.h;*.h++;*.hh;*.hpp;*.hta;*.htm;*.html;*.hxx;*.idl;*.ini;*.jl;*.java;*.js;*.json;*.lisp;*.lua;*.m4;*.md;*.nfo;*.nim;*.pas;*.pem;*.php;*.php3;*.php4;*.ps;*.rb;*.rc;*.reg;*.rgs;*.rs;*.rst;*.s;*.scala;*.scm;*.sh;*.shar;*.shtm;*.shtml;*.sl;*.svg;*.txt;*vb;*.vbox;*.vbs;*.y;*.yml;*.yaml"},
-			{L"Text Documents", L"*.txt"},
-			{L"All Files", L"*.*"}
-		};
+        OFN.lpTemplateName= TEXT("NpEncodingDialog");
+        OFN.lpfnHook= NpSaveDialogHookProc;
 
-		// event handler is only necessary for the open dialog
-		if (!fInSaveAsDlg) {
-			// set up the event handler (see OnSelectionChange)
-			if (!(pfde = GlobalAlloc(GMEM_FIXED, sizeof(*pfde)))) return FALSE;
-			pfde->lpVtbl = &IFileDialogEvents_Vtbl;
-			pfdCall(Advise, pfde, &dwCookie);
-		}
-
-		// setup the encoding selector combo box
-		pfdCall(QueryInterface, &IID_IFileDialogCustomize, &pfdc);
-		pfdcCall(StartVisualGroup, dwIDEncodingLabel, TEXT("&Encoding:"));
-		pfdcCall(AddComboBox, dwIDEncodingComboBox);
-		pfdcCall(AddControlItem, dwIDEncodingComboBox, FT_ANSI, szFtAnsi);
-		pfdcCall(AddControlItem, dwIDEncodingComboBox, FT_UNICODE, szFtUnicode); // aka UTF-16 LE
-		pfdcCall(AddControlItem, dwIDEncodingComboBox, FT_UNICODEBE, szFtUnicodeBe); // aka UTF-16 BE
-		pfdcCall(AddControlItem, dwIDEncodingComboBox, FT_UTF8, szFtUtf8);
-		
-		switch (g_ftOpenedAs) {
-		case FT_UNICODE:  //fallthrough
-		case FT_UNICODEBE://fallthrough
-		case FT_UTF8:		pfdcCall(SetSelectedControlItem, dwIDEncodingComboBox, g_ftOpenedAs); break;
-		default:			pfdcCall(SetSelectedControlItem, dwIDEncodingComboBox, 0); break;
-		}
-		
-		pfdcCall(MakeProminent, dwIDEncodingLabel);
-		pfdcCallNA(EndVisualGroup);
-
-		pfdCall(GetOptions, &dwFlags);
-		pfdCall(SetOptions, dwFlags | FOS_FORCEFILESYSTEM | FOS_FILEMUSTEXIST);
-
-		if (fInSaveAsDlg) {
-			// Win7 notepad automatically populates the field with the last used filename
-			// (not including the full file path) or "*.txt" if no filename exists
-			const TCHAR *BareFileName = PathFindFileName(szFileName);
-
-			if (_tcslen(BareFileName) == 0)
-				BareFileName = TEXT("*.txt");
-
-			pfdCall(SetFileName, BareFileName);
-		}
-
-		pfdCall(SetFileTypes, ARRAYSIZE(filterFileExt), filterFileExt);
-		pfdCall(SetFileTypeIndex, 1); // 1-based - so this will set the first entry in filterFileExt table
-		pfdCall(SetDefaultExtension, L"txt");
-		pfdCall(Show, hwndNP);
-		pfdCall(GetResult, &psiResult);
-		pfdcCall(GetSelectedControlItem, dwIDEncodingComboBox, &dwSelectedEncoding);
-		
-		if (fInSaveAsDlg) {
-			g_ftSaveAs = (NP_FILETYPE) dwSelectedEncoding;
-		} else {
-			g_ftOpenedAs = (NP_FILETYPE) dwSelectedEncoding;
-		}
-
-		if (SUCCEEDED(psiResult->lpVtbl->GetDisplayName(psiResult, SIGDN_FILESYSPATH, &szName))) {
-			_tcsncpy(szNewName, szName, (MAX_PATH-1)/sizeof(TCHAR));
-			CoTaskMemFree(szName);
-			psiResult->lpVtbl->Release(psiResult);
-			pfdc->lpVtbl->Release(pfdc);
-			if (!fInSaveAsDlg) pfdCall(Unadvise, dwCookie);
-			pfdCallNA(Release);
-			return TRUE;
-		}
-
-		return FALSE;
+        /* ALL non-zero long pointers must be defined immediately
+            * before the call, as the DS might move otherwise.
+            * 12 February 1991    clarkc
+            */
+        OFN.lpstrFilter       = szSaveFilterSpec;
+        OFN.lpstrDefExt       = TEXT("txt");
+		OFN.nFilterIndex= FILE_TEXT;
+		return GetSaveFileName(&OFN);
 	} else {
-		// use old style dialog (windows xp style)
+		/* set up the variable fields of the OPENFILENAME struct.
+			* (the constant fields have been set in NPInit()
+			*/
+	    OFN.lpstrFile         = szNewName;
+	    lstrcpy(szNewName, TEXT("*.txt") ); /* set default selection */
+	    OFN.lpstrTitle        = szOpenCaption;
 
-		if (fInSaveAsDlg) {
-			OFN.lpstrFile       = szNewName;
-            OFN.lpstrTitle      = szSaveCaption;
-            /* Added OFN_PATHMUSTEXIST to eliminate problems in SaveFile.
-             * 12 February 1991    clarkc
-             */
-            OFN.Flags = OFN_HIDEREADONLY     | OFN_OVERWRITEPROMPT |
-                        OFN_NOREADONLYRETURN | OFN_PATHMUSTEXIST   |
-                        OFN_EXPLORER         |
-                        OFN_ENABLESIZING     |
-                        OFN_ENABLETEMPLATE   | OFN_ENABLEHOOK;
+	    /* ALL non-zero long pointers must be defined immediately
+	        * before the call, as the DS might move otherwise.
+	        * 12 February 1991    clarkc
+	        */
+	    OFN.lpstrFilter       = szOpenFilterSpec;
+	    OFN.lpstrDefExt       = TEXT("txt");
+	    /* Added OFN_FILEMUSTEXIST to eliminate problems in LoadFile.
+	        * 12 February 1991    clarkc
+	        */
+	    OFN.Flags          = OFN_HIDEREADONLY | OFN_FILEMUSTEXIST |
+	                            OFN_EXPLORER         |
+	                            OFN_ENABLESIZING     |
+	                            OFN_ENABLETEMPLATE   | OFN_ENABLEHOOK;
 
-            OFN.lpTemplateName= TEXT("NpEncodingDialog");
-            OFN.lpfnHook= NpSaveDialogHookProc;
-
-            /* ALL non-zero long pointers must be defined immediately
-             * before the call, as the DS might move otherwise.
-             * 12 February 1991    clarkc
-             */
-            OFN.lpstrFilter       = szSaveFilterSpec;
-            OFN.lpstrDefExt       = TEXT("txt");
-			OFN.nFilterIndex= FILE_TEXT;
-			return GetSaveFileName(&OFN);
-		} else {
-			/* set up the variable fields of the OPENFILENAME struct.
-			 * (the constant fields have been set in NPInit()
-			 */
-	        OFN.lpstrFile         = szNewName;
-	        lstrcpy(szNewName, TEXT("*.txt") ); /* set default selection */
-	        OFN.lpstrTitle        = szOpenCaption;
-
-	        /* ALL non-zero long pointers must be defined immediately
-	         * before the call, as the DS might move otherwise.
-	         * 12 February 1991    clarkc
-	         */
-	        OFN.lpstrFilter       = szOpenFilterSpec;
-	        OFN.lpstrDefExt       = TEXT("txt");
-	        /* Added OFN_FILEMUSTEXIST to eliminate problems in LoadFile.
-	         * 12 February 1991    clarkc
-	         */
-	        OFN.Flags          = OFN_HIDEREADONLY | OFN_FILEMUSTEXIST |
-	                             OFN_EXPLORER         |
-	                             OFN_ENABLESIZING     |
-	                             OFN_ENABLETEMPLATE   | OFN_ENABLEHOOK;
-
-	        OFN.nFilterIndex   = FILE_TEXT;
+	    OFN.nFilterIndex   = FILE_TEXT;
               
-	        // show encoding listbox
-	        OFN.lpTemplateName= TEXT("NpEncodingDialog");
-	        OFN.lpfnHook= NpOpenDialogHookProc;
-			return GetOpenFileName(&OFN);
-		}
+	    // show encoding listbox
+	    OFN.lpTemplateName= TEXT("NpEncodingDialog");
+	    OFN.lpfnHook= NpOpenDialogHookProc;
+		return GetOpenFileName(&OFN);
 	}
 }
 
